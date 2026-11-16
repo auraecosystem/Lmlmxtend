@@ -19,7 +19,7 @@
 - [ ] CPU, memory, concurrency accounting, and forced termination (requires isolation).
 - [x] Read-only extension health reporting.
 - [ ] Property tests and fuzz targets.
-- [ ] CI for formatting, linting, and workspace tests.
+- [x] CI for formatting, linting, and workspace tests.
 
 - [x] Initial intelligence crate with capability discovery, API-version checks, explicit provider preference, and runtime-mediated dispatch.
 - [x] Initial agent-runtime workspace boundary with permission-aware registration and bounded delegation.
@@ -37,7 +37,10 @@
 - [x] Deterministic capability discovery and task planning (single-provider registry).
 - [ ] Multi-provider ranking and semantic task orchestration.
 - [x] Initial synchronous agent lifecycle and nested task delegation with cycle/depth limits.
-- [x] Deterministic DAG validation, topological ordering, and sequential fail-fast agent-plan execution.
+- [x] Deterministic DAG validation, dependency waves, and fail-fast agent-plan execution.
+- [x] Bounded parallel execution (1–32 workers) with dependency barriers and panic/error handling.
+- [x] Per-root-execution shared key/value state and bounded in-process agent mailboxes.
+- [ ] Durable shared state, cross-process messaging, retries, rollback, and distributed scheduling.
 - [ ] Parallel scheduling, durable task state, and inter-agent messaging.
 - [ ] Typed image, audio, video, and spatial data contracts.
 - [ ] Streaming and cancellation semantics.

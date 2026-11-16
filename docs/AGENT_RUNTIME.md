@@ -12,9 +12,9 @@ Each agent registers an `AgentManifest` containing:
 - the exact extension capabilities it is permitted to invoke.
 
 The runtime snapshots this manifest during registration. Agent implementations
-receive an `AgentContext`, not ambient authority. The context exposes the current
-agent identity, request lifecycle controls, capability execution, and bounded
-delegation to another registered agent.
+receive a structured `AgentContext`. Its provided capability-execution method
+checks each requested capability against the registered manifest, and the context
+also exposes lifecycle controls and bounded delegation to another registered agent.
 
 ## Delegation and permissions
 
@@ -58,8 +58,12 @@ impl Agent for EchoAgent {
     }
 }
 
+use lmlmxtend_core::RuntimeConfig;
+use lmlmxtend_runtime::Runtime;
+
 let mut agents = AgentRuntime::default();
 agents.register(Arc::new(EchoAgent))?;
+let extension_runtime = Runtime::new(RuntimeConfig::default());
 let result = agents.execute(
     &extension_runtime,
     "agent.echo",

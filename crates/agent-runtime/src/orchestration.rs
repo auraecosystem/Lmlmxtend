@@ -333,10 +333,11 @@ impl AgentRuntime {
                     handles
                         .into_iter()
                         .map(|(node_id, handle)| match handle.join() {
-                            Ok(result) => (node_id, result),
+                            Ok(result) => (node_id, result, false),
                             Err(_) => (
                                 node_id,
-                                Err(AgentError::ExecutionFailed("agent thread panicked".into())),
+                                Err(AgentError::ExecutionFailed("agent worker panicked".into())),
+                                true,
                             ),
                         })
                         .collect::<Vec<_>>()

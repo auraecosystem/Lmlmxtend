@@ -142,3 +142,14 @@ Next development target
 Execution lifecycle: cancellation tokens, request deadlines, controlled shutdown and resource accounting.
 
 The LMLM processor bridge remains dependent on inspecting the actual LMLM implementation before defining its integration contract.
+
+
+## Execution lifecycle hardening
+
+- Added a shared cancellation token and monotonic request deadline to the API.
+- Added a context-aware extension method while retaining the legacy execute method.
+- Runtime rejects pre-cancelled and expired requests before dispatch.
+- Runtime enforces a host-configured maximum response size after extension execution.
+- Added regression coverage for cancellation, deadlines, and output limits.
+- Documented that synchronous legacy extensions cannot be forcibly interrupted and that CPU/memory isolation remains future work.
+- Rust compilation and tests remain unverified until a Rust toolchain or CI run is available.

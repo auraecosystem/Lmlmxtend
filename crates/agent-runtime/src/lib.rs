@@ -682,7 +682,7 @@ mod tests {
     #[test]
     fn enforces_task_input_and_output_limits() {
         let mut agents = AgentRuntime::new(AgentRuntimeConfig {
-            max_task_input_bytes: 2,
+            max_task_input_bytes: 3,
             max_task_output_bytes: 2,
             max_delegation_depth: 1,
         });

@@ -776,4 +776,6 @@ mod tests {
 }
 
 mod orchestration;
-pub use orchestration::{AgentPlan, PlanError, PlanNode, PlanResult, MAX_PLAN_NODES};
+pub use orchestration::{
+    AgentPlan, PlanError, PlanNode, PlanResult, MAX_PARALLEL_TASKS, MAX_PLAN_NODES,
+};

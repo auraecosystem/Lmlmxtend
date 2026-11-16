@@ -10,6 +10,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::sync::Arc;
 
+mod coordination;
+pub use coordination::{AgentMessage, AgentMessageBus, AgentSharedState};
+use coordination::AgentCoordination;
+
 /// Agent contract version. Independent from extension API versioning.
 pub const AGENT_API_VERSION: u16 = 1;
 
@@ -95,6 +99,10 @@ pub enum AgentError {
     Cancelled,
     DeadlineExceeded,
     ExecutionFailed(String),
+    SharedStateLimitExceeded,
+    MessageTargetNotFound(String),
+    MessageTooLarge,
+    MessageQueueFull,
 }
 
 impl fmt::Display for AgentError {
@@ -116,6 +124,10 @@ impl fmt::Display for AgentError {
             Self::Cancelled => f.write_str("agent execution cancelled"),
             Self::DeadlineExceeded => f.write_str("agent execution deadline exceeded"),
             Self::ExecutionFailed(reason) => write!(f, "agent execution failed: {reason}"),
+            Self::SharedStateLimitExceeded => f.write_str("shared task state limit exceeded"),
+            Self::MessageTargetNotFound(id) => write!(f, "message target is not registered: {id}"),
+            Self::MessageTooLarge => f.write_str("agent message exceeds configured byte limit"),
+            Self::MessageQueueFull => f.write_str("agent message queue is full"),
         }
     }
 }
@@ -156,7 +168,9 @@ pub struct AgentContext<'a> {
     allowed_capabilities: &'a BTreeSet<CapabilityId>,
     execution: &'a ExecutionContext,
     correlation_id: Option<String>,
+    task_id: String,
     delegation_stack: Vec<String>,
+    coordination: AgentCoordination,
 }
 
 impl<'a> AgentContext<'a> {
@@ -166,6 +180,28 @@ impl<'a> AgentContext<'a> {
 
     pub fn execution_context(&self) -> &ExecutionContext {
         self.execution
+    }
+
+    /// Shared key/value state scoped to the root execution and inherited by delegates.
+    pub fn shared_state(&self) -> &AgentSharedState {
+        &self.coordination.shared_state
+    }
+
+    /// Send a bounded message to another registered agent. The recipient can
+    /// drain messages when it next runs; message delivery is in-process only.
+    pub fn send_message(&self, target_agent: &str, payload: impl Into<String>) -> Result<(), AgentError> {
+        self.coordination.message_bus.send(AgentMessage {
+            from_agent_id: self.agent_id.clone(),
+            to_agent_id: target_agent.to_owned(),
+            task_id: self.task_id.clone(),
+            correlation_id: self.correlation_id.clone(),
+            payload: payload.into(),
+        })
+    }
+
+    /// Drain messages queued for the currently executing agent.
+    pub fn receive_messages(&self) -> Result<Vec<AgentMessage>, AgentError> {
+        self.coordination.message_bus.receive(&self.agent_id)
     }
 
     /// Execute an extension capability only if this agent declared it in its manifest.
@@ -210,6 +246,7 @@ impl<'a> AgentContext<'a> {
             task,
             self.execution,
             self.delegation_stack.clone(),
+            self.coordination.clone(),
         )
     }
 }
@@ -286,7 +323,8 @@ impl AgentRuntime {
         task: AgentTask,
         execution: &ExecutionContext,
     ) -> Result<AgentResponse, AgentError> {
-        self.execute_inner(runtime, agent_id, task, execution, Vec::new())
+        let coordination = AgentCoordination::new(self.agents.keys().cloned().collect());
+        self.execute_inner(runtime, agent_id, task, execution, Vec::new(), coordination)
     }
 
     fn execute_inner(
@@ -296,6 +334,7 @@ impl AgentRuntime {
         task: AgentTask,
         execution: &ExecutionContext,
         mut delegation_stack: Vec<String>,
+        coordination: AgentCoordination,
     ) -> Result<AgentResponse, AgentError> {
         execution.check_cancelled().map_err(map_lifecycle_error)?;
         if task.input.len() > self.config.max_task_input_bytes {
@@ -321,7 +360,9 @@ impl AgentRuntime {
             allowed_capabilities: &allowed,
             execution,
             correlation_id: task.correlation_id.clone(),
+            task_id: task.task_id.clone(),
             delegation_stack,
+            coordination,
         };
         let response = match agent.execute(task, &context) {
             Ok(response) => response,

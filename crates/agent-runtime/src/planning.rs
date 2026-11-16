@@ -69,7 +69,10 @@ impl fmt::Display for GoalPlanningError {
         match self {
             Self::InvalidRequest(reason) => write!(f, "invalid goal request: {reason}"),
             Self::GoalTooLarge => write!(f, "goal exceeds the {MAX_GOAL_BYTES}-byte limit"),
-            Self::PlanTooLarge => write!(f, "proposed plan exceeds the {MAX_GOAL_PLAN_BYTES}-byte limit"),
+            Self::PlanTooLarge => write!(
+                f,
+                "proposed plan exceeds the {MAX_GOAL_PLAN_BYTES}-byte limit"
+            ),
             Self::PlannerFailed(reason) => write!(f, "goal planner failed: {reason}"),
         }
     }
@@ -129,7 +132,10 @@ impl AgentRuntime {
             .propose(request, &available_agents)
             .map_err(GoalExecutionError::Planning)?;
         let plan_bytes = plan.nodes().iter().fold(0usize, |total, node| {
-            let dependency_bytes = node.depends_on.iter().fold(0usize, |sum, id| sum.saturating_add(id.len()));
+            let dependency_bytes = node
+                .depends_on
+                .iter()
+                .fold(0usize, |sum, id| sum.saturating_add(id.len()));
             total
                 .saturating_add(node.id.len())
                 .saturating_add(node.agent_id.len())
@@ -139,7 +145,9 @@ impl AgentRuntime {
                 .saturating_add(dependency_bytes)
         });
         if plan_bytes > MAX_GOAL_PLAN_BYTES {
-            return Err(GoalExecutionError::Planning(GoalPlanningError::PlanTooLarge));
+            return Err(GoalExecutionError::Planning(
+                GoalPlanningError::PlanTooLarge,
+            ));
         }
 
         let result = self
@@ -296,7 +304,13 @@ mod tests {
         let runtime = Runtime::new(RuntimeConfig::default());
         let request = GoalRequest::new("goal-oversized", "run a bounded plan").unwrap();
         assert_eq!(
-            agents.execute_goal(&runtime, &OversizedPlanner, &request, &execution_context(), 1),
+            agents.execute_goal(
+                &runtime,
+                &OversizedPlanner,
+                &request,
+                &execution_context(),
+                1
+            ),
             Err(GoalExecutionError::Planning(GoalPlanningError::PlanTooLarge))
         );
     }

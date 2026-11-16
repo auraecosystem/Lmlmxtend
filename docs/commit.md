@@ -50,4 +50,46 @@ Next implementation stage
 * Develop Rust, Python and TypeScript SDKs.
 * Add an optional Olgin adapter without making Olgin a dependency.
 
-The foundation is in place. The next major milestone is connecting LMLMxtend to the actual LMLM processor—not inventing a substitute for it.
+Commit pushed and verified
+
+I’ll treat LMLMxtend as an ongoing development project, not a one-off scaffold. I’ve inspected the latest repository state and started the next implementation cycle.
+
+Repository: auraecosystem/Lmlmxtend⁠￼
+
+First development update
+
+Committed directly to main:
+
+* Fixed a runtime validation bug that allowed an extension to declare the same capability more than once.
+* Added a regression test for duplicate capability declarations.
+* Ensured failed registration does not leave partially registered capabilities.
+* Preserved the existing repository structure and doc.rSt.md.
+
+Commit: f98dde7⁠￼
+
+Continuous development sequence
+
+Stage	Work
+1	Runtime hardening, lifecycle, errors and resource controls
+2	LMLM processor bridge, based on the actual LMLM interface
+3	Agent orchestration and task execution
+4	Vision, audio, video and spatial interfaces
+5	Extension security and sandboxing
+6	Rust, Python and TypeScript SDKs
+7	Optional Olgin integration
+8	Integration tests, documentation and release preparation
+
+How I’ll manage development
+
+For each development cycle:
+
+* Inspect the latest repository state.
+* Implement a coherent, tested change.
+* Update documentation and roadmap.
+* Run available checks and inspect CI results.
+* Commit verified changes to the repository.
+* Report the commit, changed files, test results and remaining blockers.
+
+One limitation: I can continue development whenever we work on the project, but I cannot independently run indefinitely in the background or promise automatic commits between conversations. GitHub Actions can handle automated builds and checks.
+
+The next priority is to harden the runtime before introducing the real LMLM processor bridge. I won’t invent processor interfaces or introduce unrelated external project dependencies.

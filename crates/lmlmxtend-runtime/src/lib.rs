@@ -39,6 +39,15 @@ impl fmt::Display for RuntimeError {
 
 impl std::error::Error for RuntimeError {}
 
+/// Read-only public metadata for a registered extension.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExtensionDescriptor {
+    pub extension_id: String,
+    pub version: String,
+    pub api_version: u16,
+    pub capabilities: Vec<CapabilityId>,
+}
+
 /// Result of probing one registered extension.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ExtensionHealth {
@@ -99,6 +108,26 @@ impl Runtime {
                 Err(error) => ExtensionHealth { extension_id: id.clone(), healthy: false, error: Some(error.to_string()) },
             }
         }).collect()
+    }
+
+    /// Returns stable, read-only metadata for registered extensions.
+    pub fn extensions(&self) -> Vec<ExtensionDescriptor> {
+        self.extensions.iter().map(|(id, extension)| {
+            let manifest = extension.manifest();
+            ExtensionDescriptor {
+                extension_id: id.clone(),
+                version: manifest.version,
+                api_version: manifest.api_version,
+                capabilities: manifest.capabilities,
+            }
+        }).collect()
+    }
+
+    /// Finds registered providers for an exact capability identifier.
+    pub fn discover_capability(&self, capability: &CapabilityId) -> Vec<ExtensionDescriptor> {
+        self.extensions().into_iter()
+            .filter(|extension| extension.capabilities.contains(capability))
+            .collect()
     }
 
     /// Number of registered extensions.

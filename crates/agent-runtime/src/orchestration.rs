@@ -154,6 +154,7 @@ pub enum PlanError {
     DuplicateDependency { node_id: String, dependency: String },
     MissingDependency { node_id: String, dependency: String },
     CycleDetected,
+    AgentNotRegistered { node_id: String, agent_id: String },
     AgentFailed { node_id: String, source: AgentError },
 }
 
@@ -170,6 +171,8 @@ impl fmt::Display for PlanError {
             Self::MissingDependency { node_id, dependency } =>
                 write!(f, "plan node '{node_id}' references missing dependency '{dependency}'"),
             Self::CycleDetected => f.write_str("agent plan contains a dependency cycle"),
+            Self::AgentNotRegistered { node_id, agent_id } =>
+                write!(f, "plan node '{node_id}' references unregistered agent '{agent_id}'"),
             Self::AgentFailed { node_id, source } =>
                 write!(f, "agent task '{node_id}' failed: {source}"),
         }
@@ -191,6 +194,17 @@ impl AgentRuntime {
         let order = plan.execution_order()?;
         let nodes: BTreeMap<&str, &PlanNode> =
             plan.nodes().iter().map(|node| (node.id.as_str(), node)).collect();
+        // Preflight every agent reference before running any user code.
+        for node_id in &order {
+            let node = nodes.get(node_id.as_str()).expect("validated node exists");
+            if !self.agents.contains_key(&node.agent_id) {
+                return Err(PlanError::AgentNotRegistered {
+                    node_id: node.id.clone(),
+                    agent_id: node.agent_id.clone(),
+                });
+            }
+        }
+
         let mut outputs = BTreeMap::new();
 
         for node_id in &order {

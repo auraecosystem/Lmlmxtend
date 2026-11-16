@@ -408,4 +408,132 @@ My recommendation is to build the Multi-Agent Runtime next:
 * Permission-aware tool access.
 * LMLM as the underlying intelligence processor.
 
-That would move LMLMxtend toward a genuine local extended-intelligence runtime, while keeping LMLM as the neural intelligence core.
+I’m implementing the next milestone in auraecosystem/Lmlmxtend: the Multi-Agent Runtime.
+
+The design will give each agent its own identity, declared capabilities and execution limits. Agents will be able to delegate bounded subtasks to other registered agents and invoke only capabilities explicitly granted to them.
+
+LMLM remains the intelligence processor; this new layer coordinates agents rather than replacing the model.
+
+Implemented and pushed
+
+The LMLMxtend Multi-Agent Runtime is now in the repository.
+
+New crate: lmlmxtend-agent-runtime
+
+A local agent orchestration layer connected to the existing intelligence router and extension runtime.
+
+View agent runtime source⁠￼
+
+1. Implemented capabilities
+
+Capability	Implementation
+Agent identities	Versioned agent manifests
+Registration	Duplicate and invalid identity rejection
+Permissions	Per-agent capability grants
+Capability execution	Through Intelligence Router
+Delegation	Agent-to-agent nested tasks
+Cycle protection	Delegation cycle detection
+Resource limits	Input/output byte limits
+Lifecycle	Cancellation and deadline propagation
+Task tracking	Task and correlation IDs
+
+2. Architecture
+
+Application
+    |
+    v
+LMLMxtend Agent Runtime
+    |
+    +---- Agent Registry
+    |
+    +---- Agent Context
+    |
+    +---- Permission Checks
+    |
+    +---- Task Delegation
+    |
+    v
+Intelligence Router
+    |
+    v
+Extension Runtime
+    |
+    v
+Registered Extensions
+         LMLM
+          |
+          v
+ Future Processor Bridge
+
+LMLM remains the neural intelligence core. Agents coordinate tasks and access approved capabilities through LMLMxtend.
+
+3. New source structure
+
+crates/
+└── agent-runtime/
+    ├── Cargo.toml
+    ├── src/
+    │   └── lib.rs
+    └── examples/
+        └── basic_agent.rs
+
+Documentation:
+
+* docs/AGENT_RUNTIME.md
+* Updated docs/ARCHITECTURE.md
+* Updated docs/SECURITY.md
+* Updated docs/ROADMAP.md
+
+4. Run it
+
+After installing Rust:
+
+cargo test --workspace
+cargo run --example basic_agent \
+  -p lmlmxtend-agent-runtime
+
+The example registers a greeting agent and executes a task.
+
+5. Tests added
+
+Ten test cases cover:
+
+* Agent registration and execution.
+* Delegation to another agent.
+* Correlation ID propagation.
+* Invalid agent identity rejection.
+* Delegation cycle protection.
+* Delegation depth enforcement.
+* Authorized capability execution.
+* Unauthorized capability rejection.
+* Input/output limits.
+* Cancellation before execution.
+
+Build verification pending
+
+I could not run Cargo, rustfmt or Clippy because this execution environment does not have the Rust toolchain installed. GitHub reported no commit status checks for the latest commit, so compilation is not yet independently verified.
+
+6. Latest commit
+
+9e79e393
+
+test(agents): verify correlation IDs survive delegation
+
+View latest commit⁠￼
+
+Open LMLMxtend repository⁠￼
+
+7. What comes next
+
+The next substantial milestone should be the Autonomous Agent Orchestration Engine:
+
+* Goal decomposition using LMLM.
+* Dynamic multi-agent task planning.
+* Parallel agent execution.
+* Shared, permission-controlled task state.
+* Inter-agent messaging.
+* Agent memory with ownership and retention controls.
+* Failure recovery and task rescheduling.
+* Local hardware and multimodal agent integration.
+
+One important boundary remains: agents currently execute synchronously inside the host process. They are not isolated or safe for untrusted third-party code. Process/WASM isolation should precede unrestricted external agent installation.

@@ -49,6 +49,7 @@ pub struct ExtensionHealth {
 
 pub struct Runtime {
     policy: ExecutionPolicy,
+    max_output_bytes: usize,
     extensions: BTreeMap<String, Arc<dyn Extension>>,
     capabilities: BTreeMap<CapabilityId, String>,
 }
@@ -56,7 +57,8 @@ pub struct Runtime {
 impl Runtime {
     pub fn new(config: RuntimeConfig) -> Self {
         Self {
-            policy: ExecutionPolicy::from_config(&config),\n            max_output_bytes: config.max_output_bytes,
+            policy: ExecutionPolicy::from_config(&config),
+            max_output_bytes: config.max_output_bytes,
             extensions: BTreeMap::new(),
             capabilities: BTreeMap::new(),
         }

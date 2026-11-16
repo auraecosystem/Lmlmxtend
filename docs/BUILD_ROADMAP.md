@@ -537,3 +537,31 @@ The next substantial milestone should be the Autonomous Agent Orchestration Engi
 * Local hardware and multimodal agent integration.
 
 One important boundary remains: agents currently execute synchronously inside the host process. They are not isolated or safe for untrusted third-party code. Process/WASM isolation should precede unrestricted external agent installation.
+
+I’m continuing in auraecosystem/Lmlmxtend from the verified latest main commit. The next increment will add a deterministic task-graph orchestrator: agents can be assigned tasks with dependencies, the runtime validates the graph before execution, and results are collected by task ID. I’m keeping this first version sequential and fail-fast rather than introducing concurrency before its cancellation and resource semantics are properly defined.
+
+The orchestration layer is now committed to the repository. It includes:
+
+* AgentPlan and PlanNode for declaring task dependencies.
+* DAG validation for missing, duplicate, repeated, self-referential and cyclic dependencies.
+* A 256-node plan limit and preflight checks that every referenced agent is registered before any agent runs.
+* Stable topological ordering, sequential execution, fail-fast errors and outputs indexed by node ID.
+* Five new orchestration tests, plus updated architecture, runtime and roadmap documentation.
+
+This is an explicit workflow engine foundation—not yet an LMLM-powered planner. It does not invent task plans from natural-language goals or silently pass one agent’s output into another agent’s input.
+
+Pushed to main
+
+Repository: auraecosystem/Lmlmxtend⁠￼
+
+Latest commit: 7ca93cc⁠￼
+
+Verification status
+
+* GitHub Actions Rust CI has started but is still running.
+* Formatting, Clippy and workspace tests have not yet reported results.
+* I could not run Cargo locally because Rust is unavailable in this environment.
+
+View the GitHub Actions run⁠￼.
+
+Next engineering milestone: parallel agent execution with bounded concurrency, shared task state and explicit inter-agent communication—after the current sequential scheduler passes CI.

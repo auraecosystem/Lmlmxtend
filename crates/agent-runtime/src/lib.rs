@@ -782,4 +782,5 @@ pub use orchestration::{
 };
 pub use planning::{
     GoalExecutionError, GoalPlanner, GoalPlanningError, GoalRequest, GoalResult, MAX_GOAL_BYTES,
+    MAX_GOAL_PLAN_BYTES,
 };

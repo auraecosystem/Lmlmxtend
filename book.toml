@@ -1,0 +1,14 @@
+[book]
+title = "LMLMxtend Documentation"
+authors = ["Seriki Walter Yakub"]
+language = "en"
+multilingual = false
+src = "docs"
+
+[build]
+build-dir = "book"
+create-missing = false
+
+[output.html]
+default-theme = "navy"
+preferred-dark-theme = "navy"

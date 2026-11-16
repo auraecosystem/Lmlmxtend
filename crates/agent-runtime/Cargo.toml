@@ -10,3 +10,6 @@ description = "Permission-aware agent lifecycle and bounded delegation for LMLMx
 lmlmxtend-api = { path = "../lmlmxtend-api" }
 lmlmxtend-runtime = { path = "../lmlmxtend-runtime" }
 lmlmxtend-intelligence = { path = "../intelligence" }
+
+[dev-dependencies]
+lmlmxtend-core = { path = "../lmlmxtend-core" }

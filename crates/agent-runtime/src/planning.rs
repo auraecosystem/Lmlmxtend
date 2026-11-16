@@ -11,6 +11,8 @@ use std::fmt;
 
 /// Maximum UTF-8 byte length accepted for a user goal.
 pub const MAX_GOAL_BYTES: usize = 64 * 1024;
+/// Maximum aggregate UTF-8 payload and metadata size accepted in a proposed goal plan.
+pub const MAX_GOAL_PLAN_BYTES: usize = 8 * 1024 * 1024;
 
 /// A bounded natural-language goal submitted to a planner.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -58,6 +60,7 @@ pub trait GoalPlanner: Send + Sync {
 pub enum GoalPlanningError {
     InvalidRequest(String),
     GoalTooLarge,
+    PlanTooLarge,
     PlannerFailed(String),
 }
 
@@ -66,6 +69,7 @@ impl fmt::Display for GoalPlanningError {
         match self {
             Self::InvalidRequest(reason) => write!(f, "invalid goal request: {reason}"),
             Self::GoalTooLarge => write!(f, "goal exceeds the {MAX_GOAL_BYTES}-byte limit"),
+            Self::PlanTooLarge => write!(f, "proposed plan exceeds the {MAX_GOAL_PLAN_BYTES}-byte limit"),
             Self::PlannerFailed(reason) => write!(f, "goal planner failed: {reason}"),
         }
     }
@@ -124,6 +128,20 @@ impl AgentRuntime {
         let plan = planner
             .propose(request, &available_agents)
             .map_err(GoalExecutionError::Planning)?;
+        let plan_bytes = plan.nodes().iter().fold(0usize, |total, node| {
+            let dependency_bytes = node.depends_on.iter().fold(0usize, |sum, id| sum.saturating_add(id.len()));
+            total
+                .saturating_add(node.id.len())
+                .saturating_add(node.agent_id.len())
+                .saturating_add(node.task.task_id.len())
+                .saturating_add(node.task.input.len())
+                .saturating_add(node.task.correlation_id.as_ref().map_or(0, String::len))
+                .saturating_add(dependency_bytes)
+        });
+        if plan_bytes > MAX_GOAL_PLAN_BYTES {
+            return Err(GoalExecutionError::Planning(GoalPlanningError::PlanTooLarge));
+        }
+
         let result = self
             .execute_plan_parallel(runtime, &plan, execution, max_parallel_tasks)
             .map_err(GoalExecutionError::Execution)?;
@@ -251,6 +269,36 @@ mod tests {
                 PlanError::AgentNotRegistered { .. }
             ))
         ));
+    }
+
+    #[test]
+    fn rejects_oversized_planner_proposal_before_agent_execution() {
+        struct OversizedPlanner;
+        impl GoalPlanner for OversizedPlanner {
+            fn propose(
+                &self,
+                _request: &GoalRequest,
+                _agents: &[AgentDescriptor],
+            ) -> Result<AgentPlan, GoalPlanningError> {
+                let mut plan = AgentPlan::new();
+                plan.add_node(crate::PlanNode::new(
+                    "oversized",
+                    "agent.echo",
+                    AgentTask::new("task-oversized", "x".repeat(MAX_GOAL_PLAN_BYTES + 1)),
+                ))
+                .map_err(|error| GoalPlanningError::PlannerFailed(error.to_string()))?;
+                Ok(plan)
+            }
+        }
+
+        let mut agents = AgentRuntime::default();
+        agents.register(Arc::new(EchoAgent)).unwrap();
+        let runtime = Runtime::new(RuntimeConfig::default());
+        let request = GoalRequest::new("goal-oversized", "run a bounded plan").unwrap();
+        assert_eq!(
+            agents.execute_goal(&runtime, &OversizedPlanner, &request, &execution_context(), 1),
+            Err(GoalExecutionError::Planning(GoalPlanningError::PlanTooLarge))
+        );
     }
 
     #[test]

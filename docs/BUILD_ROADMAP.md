@@ -590,5 +590,66 @@ The first CI attempt exposed Rust formatting differences. I corrected them and t
 Important remaining boundary
 
 This is not yet a live LMLM connection. The repository still needs a stable processor-facing API or transport. The new interface makes that integration possible without introducing an external model provider or allowing model-generated plans to bypass runtime security.
-
+>
 Next milestone: connect the actual LMLM processor to GoalPlanner, then implement semantic task decomposition, capability-aware agent assignment, and coordinated result synthesis.
+LMLMxtend has been updated, and both implementation pull requests are merged into main.
+
+Repository: auraecosystem/Lmlmxtend⁠￼
+
+1. Goal-planning integration
+
+Merged PR #2⁠￼.
+
+Implemented:
+
+* GoalPlanner interface.
+* Bounded natural-language GoalRequest.
+* Agent discovery for planner decisions.
+* AgentRuntime::execute_goal().
+* Validation of model-proposed task graphs.
+* Guarded execution using existing permissions and concurrency limits.
+
+2. Build and documentation repairs
+
+Merged PR #3⁠￼.
+
+Implemented:
+
+* Fixed Rust formatting.
+* Added book.toml.
+* Added docs/SUMMARY.md.
+* Configured mdBook to build from the existing documentation.
+* Corrected the GitHub Pages artifact directory.
+* Updated the architecture documentation.
+
+3. Verification
+
+Rust formatting
+
+Passed
+
+Clippy with warnings denied
+
+Passed
+
+Workspace tests
+
+Passed
+
+mdBook deployment
+
+Pending verification
+
+Main commit: f0e77d9914fd7c49eeb9e695fc07e97d12280b5d
+
+View Rust CI⁠￼
+
+4. Important processor integration boundary
+
+I inspected the repository’s actual implementation. It contains extension contracts, capability routing, agent orchestration, and a model-artifact integration example, but it does not contain a concrete LMLM neural processor API that can be called by the Rust runtime.
+
+I have deliberately not invented a processor connection or introduced an unrelated model provider.
+
+Next engineering milestone: implement the concrete LMLM processor adapter once its actual inference interface is available, followed by semantic task decomposition, agent assignment, and coordinated result synthesis.
+
+The existing runtime is now better prepared for that connection.

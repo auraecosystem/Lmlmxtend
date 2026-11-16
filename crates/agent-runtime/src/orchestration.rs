@@ -301,6 +301,24 @@ mod tests {
     }
 
     #[test]
+    fn preflights_all_agent_registrations_before_execution() {
+        let mut agents = AgentRuntime::default();
+        agents.register(Arc::new(EchoAgent)).unwrap();
+        let mut plan = AgentPlan::new();
+        plan.add_node(PlanNode::new("first", "agent.echo", AgentTask::new("t1", "one"))).unwrap();
+        plan.add_node(PlanNode::new("second", "agent.missing", AgentTask::new("t2", "two")).after("first")).unwrap();
+
+        let runtime = Runtime::new(RuntimeConfig::default());
+        assert_eq!(
+            agents.execute_plan(&runtime, &plan, &context()),
+            Err(PlanError::AgentNotRegistered {
+                node_id: "second".into(),
+                agent_id: "agent.missing".into(),
+            })
+        );
+    }
+
+    #[test]
     fn rejects_empty_plan() {
         assert_eq!(AgentPlan::new().execution_order(), Err(PlanError::EmptyPlan));
     }

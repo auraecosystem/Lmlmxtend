@@ -23,7 +23,7 @@ The initial Rust workspace contains:
 - `lmlmxtend-agent-runtime`: permission-aware agent registration, bounded delegation, deterministic DAG plans, bounded parallel execution, per-execution shared state and messaging, capability invocation, and lifecycle propagation.
 - `lmlmxtend-extension-forge`: a native CLI that scaffolds validated, standalone extension crates.
 
-The agent-plan scheduler validates dependencies and agent registrations before execution. Independent tasks can run in bounded parallel batches (up to 32 workers), while dependency waves preserve ordering. Agents share an isolated in-memory key/value store and bounded mailboxes within one root execution. The scheduler is fail-fast at batch boundaries; it does not yet provide durable workflows or distributed workers.
+The agent-plan scheduler validates dependencies and agent registrations before execution. Goal-planner proposals submitted through `execute_goal` are also capped at 8 MiB of aggregate task input and plan metadata before any agent starts. Independent tasks can run in bounded parallel batches (up to 32 workers), while dependency waves preserve ordering. Agents share an isolated in-memory key/value store and bounded mailboxes within one root execution. The scheduler is fail-fast at batch boundaries; it does not yet provide durable workflows or distributed workers.
 
 The current dispatcher is an integration foundation. It does **not** contain neural-network weights, inference kernels, a model implementation, or a production sandbox.
 

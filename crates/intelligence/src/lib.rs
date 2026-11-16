@@ -3,7 +3,7 @@
 //! This layer routes declared capabilities; it does not implement or replace
 //! the LMLM neural processor.
 
-use lmlmxtend_api::{CapabilityId, ExtensionRequest, ExtensionResponse};
+use lmlmxtend_api::{CapabilityId, ExecutionContext, ExtensionRequest, ExtensionResponse};
 use lmlmxtend_runtime::{ExtensionDescriptor, Runtime, RuntimeError};
 use std::fmt;
 
@@ -148,6 +148,19 @@ impl IntelligenceRouter {
         let mut request = ExtensionRequest::new(plan.capability, intent.input);
         request.correlation_id = intent.correlation_id;
         runtime.execute(request).map_err(IntelligenceError::Runtime)
+    }
+
+    /// Executes a planned task with caller-supplied cancellation and deadline controls.
+    pub fn execute_with_context(
+        &self,
+        runtime: &Runtime,
+        intent: TaskIntent,
+        context: &ExecutionContext,
+    ) -> Result<ExtensionResponse, IntelligenceError> {
+        let plan = self.plan(runtime, &intent).map_err(IntelligenceError::Routing)?;
+        let mut request = ExtensionRequest::new(plan.capability, intent.input);
+        request.correlation_id = intent.correlation_id;
+        runtime.execute_with_context(request, context).map_err(IntelligenceError::Runtime)
     }
 }
 

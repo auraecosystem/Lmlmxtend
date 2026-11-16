@@ -1,7 +1,7 @@
 use std::env;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 const CATEGORIES: &[&str] = &["creative", "language", "vision", "audio", "spatial", "agents"];
 
@@ -57,6 +57,9 @@ fn create_extension(args: Vec<String>) -> Result<(), String> {
     let category = category.ok_or("required option: --category")?;
     let capability = capability.ok_or("required option: --capability")?;
     validate_slug(&name)?;
+    if root.is_absolute() || root.components().any(|part| matches!(part, Component::ParentDir)) {
+        return Err("--root must be a repository-relative path without '..' components".into());
+    }
     if !CATEGORIES.contains(&category.as_str()) {
         return Err(format!("unsupported category '{category}'. Choose: {}", CATEGORIES.join(", ")));
     }
@@ -201,5 +204,10 @@ mod tests {
     #[test]
     fn converts_slug_to_rust_type_name() {
         assert_eq!(to_type_name("scene-composer"), "SceneComposer");
+    }
+
+    #[test]
+    fn computes_api_path_from_default_extension_root() {
+        assert_eq!(relative_api_path(Path::new("extensions/creative/scene-composer")), "../../../crates/lmlmxtend-api");
     }
 }

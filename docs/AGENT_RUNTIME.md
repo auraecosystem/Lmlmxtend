@@ -12,8 +12,8 @@ Each agent registers an `AgentManifest` containing:
 - the exact extension capabilities it is permitted to invoke.
 
 The runtime snapshots this manifest during registration. Agent implementations
-receive a structured `AgentContext`. Its provided capability-execution method
-checks each requested capability against the registered manifest, and the context
+receive a structured `AgentContext`. Its capability-execution method checks
+each requested capability against the registered manifest, and the context
 also exposes lifecycle controls and bounded delegation to another registered agent.
 
 ## Delegation and permissions
@@ -27,56 +27,50 @@ also exposes lifecycle controls and bounded delegation to another registered age
 - Cancellation and deadlines are propagated through nested calls.
 - Explicit task and correlation IDs are carried by the task contract.
 
-## Example
+## Deterministic task plans
+
+`AgentPlan` describes a directed acyclic graph of `PlanNode` tasks. Each node
+names a registered agent, carries an explicit `AgentTask`, and may list node IDs
+that must complete before it can start.
 
 ```rust
-use lmlmxtend_agent_runtime::{
-    Agent, AgentContext, AgentManifest, AgentResponse, AgentRuntime, AgentTask,
-    AGENT_API_VERSION,
-};
-use lmlmxtend_api::ExecutionContext;
-use std::sync::Arc;
+use lmlmxtend_agent_runtime::{AgentPlan, AgentTask, PlanNode};
 
-struct EchoAgent;
-
-impl Agent for EchoAgent {
-    fn manifest(&self) -> AgentManifest {
-        AgentManifest {
-            id: "agent.echo".into(),
-            version: "1.0.0".into(),
-            api_version: AGENT_API_VERSION,
-            capabilities: vec![],
-        }
-    }
-
-    fn execute(
-        &self,
-        task: AgentTask,
-        _context: &AgentContext<'_>,
-    ) -> Result<AgentResponse, lmlmxtend_agent_runtime::AgentError> {
-        Ok(AgentResponse::text(task.input))
-    }
-}
-
-use lmlmxtend_core::RuntimeConfig;
-use lmlmxtend_runtime::Runtime;
-
-let mut agents = AgentRuntime::default();
-agents.register(Arc::new(EchoAgent))?;
-let extension_runtime = Runtime::new(RuntimeConfig::default());
-let result = agents.execute(
-    &extension_runtime,
-    "agent.echo",
-    AgentTask::new("task-001", "Hello from an agent"),
-    &ExecutionContext::default(),
+// Assume `agents`, `extension_runtime`, and `execution_context` are configured.
+let mut plan = AgentPlan::new();
+plan.add_node(PlanNode::new(
+    "research",
+    "agent.research",
+    AgentTask::new("task-research", "Gather relevant facts"),
+))?;
+plan.add_node(
+    PlanNode::new(
+        "draft",
+        "agent.writer",
+        AgentTask::new("task-draft", "Write a concise draft"),
+    )
+    .after("research"),
 )?;
+let result = agents.execute_plan(&extension_runtime, &plan, &execution_context)?;
+assert_eq!(result.execution_order, vec!["research", "draft"]);
 ```
+
+Before invoking any agent, the scheduler validates duplicate IDs, missing
+dependencies, repeated dependencies, self-dependencies, cycles, and the
+256-node limit. It then runs nodes sequentially in stable topological order
+(lexical node ID order among equally-ready nodes), collecting outputs by node
+ID. A task's input is never silently rewritten with predecessor output; agents
+must receive any required data through explicit task construction by the host.
+
+Execution is fail-fast. A failed node stops the plan and is reported with its
+node ID and underlying `AgentError`. There is no implicit retry, rollback,
+parallel execution, or durable checkpointing.
 
 ## Current boundaries
 
 - Agents are synchronous, in-process Rust implementations.
-- Delegation is nested and synchronous; this is not yet a distributed message bus,
-  parallel scheduler, or durable workflow engine.
+- Task-graph execution is deterministic and sequential; it is not a parallel
+  scheduler, distributed message bus, or durable workflow engine.
 - Agent manifests express capability grants but do not sandbox trusted Rust code.
   An agent can still use any ambient operating-system authority available to the
   host process. Do not register untrusted agent code.

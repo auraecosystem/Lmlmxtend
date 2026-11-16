@@ -11,9 +11,10 @@
 
 ## Milestone 1 — Runtime hardening
 
-- [ ] Structured errors and tracing hooks.
+- [x] Structured runtime errors with Display/Error implementations.
+- [ ] Tracing hooks.
 - [ ] Cancellation, deadlines, and resource accounting.
-- [ ] Extension lifecycle and health reporting.
+- [x] Read-only extension health reporting.
 - [ ] Property tests and fuzz targets.
 - [ ] CI for formatting, linting, and workspace tests.
 

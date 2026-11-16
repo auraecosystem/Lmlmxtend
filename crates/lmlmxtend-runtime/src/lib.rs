@@ -4,8 +4,9 @@ use lmlmxtend_api::{CapabilityId, Extension, ExtensionError, ExtensionManifest, 
 use lmlmxtend_core::{ExecutionPolicy, PolicyDecision, RuntimeConfig};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
+use std::fmt;
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RuntimeError {
     DuplicateExtension(String),
     DuplicateCapability(String),
@@ -14,6 +15,30 @@ pub enum RuntimeError {
     PolicyDenied,
     Extension(ExtensionError),
     InvalidManifest(String),
+}
+
+impl fmt::Display for RuntimeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::DuplicateExtension(id) => write!(f, "extension already registered: {id}"),
+            Self::DuplicateCapability(id) => write!(f, "capability already registered: {id}"),
+            Self::ExtensionNotFound(id) => write!(f, "extension not found: {id}"),
+            Self::CapabilityNotDeclared(id) => write!(f, "capability not declared: {id}"),
+            Self::PolicyDenied => f.write_str("request denied by runtime policy"),
+            Self::Extension(error) => write!(f, "{error}"),
+            Self::InvalidManifest(reason) => write!(f, "invalid extension manifest: {reason}"),
+        }
+    }
+}
+
+impl std::error::Error for RuntimeError {}
+
+/// Result of probing one registered extension.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExtensionHealth {
+    pub extension_id: String,
+    pub healthy: bool,
+    pub error: Option<String>,
 }
 
 pub struct Runtime {
@@ -57,6 +82,19 @@ impl Runtime {
         self.extensions.insert(manifest.id, extension);
         Ok(())
     }
+
+    /// Probes registered extensions in stable ID order without changing registry state.
+    pub fn health_report(&self) -> Vec<ExtensionHealth> {
+        self.extensions.iter().map(|(id, extension)| {
+            match extension.health_check() {
+                Ok(()) => ExtensionHealth { extension_id: id.clone(), healthy: true, error: None },
+                Err(error) => ExtensionHealth { extension_id: id.clone(), healthy: false, error: Some(error.to_string()) },
+            }
+        }).collect()
+    }
+
+    /// Number of registered extensions.
+    pub fn extension_count(&self) -> usize { self.extensions.len() }
 
     /// Dispatches a request only when the extension declared the capability
     /// and host policy permits the request.

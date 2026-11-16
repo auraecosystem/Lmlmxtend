@@ -69,6 +69,11 @@ pub struct ExtensionManifest {
 /// Implementations must document resource limits and treat caller input as untrusted.
 pub trait Extension: Send + Sync {
     fn manifest(&self) -> ExtensionManifest;
+
+    /// Performs a lightweight readiness check. Implementations should not start
+    /// expensive work or mutate extension state from this method.
+    fn health_check(&self) -> Result<(), ExtensionError> { Ok(()) }
+
     fn execute(&self, request: ExtensionRequest) -> Result<ExtensionResponse, ExtensionError>;
 }
 
@@ -79,6 +84,18 @@ pub enum ExtensionError {
     ExecutionFailed(String),
     UnsupportedOperation,
 }
+
+impl fmt::Display for ExtensionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidInput(message) => write!(f, "invalid extension input: {message}"),
+            Self::ExecutionFailed(message) => write!(f, "extension execution failed: {message}"),
+            Self::UnsupportedOperation => f.write_str("extension operation is unsupported"),
+        }
+    }
+}
+
+impl std::error::Error for ExtensionError {}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ContractError {

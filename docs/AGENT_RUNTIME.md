@@ -57,7 +57,7 @@ assert_eq!(result.execution_order, vec!["research", "draft"]);
 
 Before invoking any agent, the scheduler validates duplicate IDs, missing
 dependencies, repeated dependencies, self-dependencies, cycles, and the
-256-node limit. It then runs nodes in stable dependency waves (lexical node ID order within each
+256-node limit. Goal-planner proposals are additionally capped at 8 MiB across task inputs, IDs, correlation IDs, and dependency references before any agent is invoked. It then runs nodes in stable dependency waves (lexical node ID order within each
 wave), collecting outputs by node ID. Independent nodes can run concurrently
 through `execute_plan_parallel`, with a host-selected limit from 1 to 32. A task's input is never silently rewritten with predecessor output; agents
 must receive any required data through explicit task construction by the host.
@@ -77,5 +77,6 @@ rollback, or durable checkpointing.
   host process. Do not register untrusted agent code.
 - Memory stores, persistent task state, independent worker processes, WASM
   isolation, resource accounting, and forced termination are future work.
+- Goal-planner proposals submitted through `execute_goal` are rejected when their aggregate plan payload and metadata exceed 8 MiB.
 - The runtime does not infer goals or implement model reasoning. LMLM remains the
   neural intelligence processor; agents coordinate bounded tasks around it.

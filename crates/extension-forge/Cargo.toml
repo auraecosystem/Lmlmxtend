@@ -6,6 +6,9 @@ license.workspace = true
 authors.workspace = true
 description = "Native scaffolding CLI for LMLMxtend extensions"
 
+[dependencies]
+lmlmxtend-api = { path = "../lmlmxtend-api" }
+
 [[bin]]
 name = "lmlmxtend-forge"
 path = "src/main.rs"

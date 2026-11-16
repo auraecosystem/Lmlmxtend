@@ -27,6 +27,7 @@
 
 ## Milestone 2 — LMLM processor bridge
 
+- [x] Add a model-agnostic goal-planner contract and guarded proposal execution.
 - [ ] Agree a stable processor-facing contract with the LMLM repository.
 - [ ] Local IPC/in-process adapter selected based on LMLM's actual runtime.
 - [ ] Capability negotiation and version compatibility.
@@ -36,12 +37,13 @@
 
 - [x] Deterministic capability discovery and task planning (single-provider registry).
 - [ ] Multi-provider ranking and semantic task orchestration.
+- [ ] Implement the concrete LMLM processor adapter after its public interface is agreed.
 - [x] Initial synchronous agent lifecycle and nested task delegation with cycle/depth limits.
 - [x] Deterministic DAG validation, dependency waves, and fail-fast agent-plan execution.
 - [x] Bounded parallel execution (1–32 workers) with dependency barriers and panic/error handling.
 - [x] Per-root-execution shared key/value state and bounded in-process agent mailboxes.
 - [ ] Durable shared state, cross-process messaging, retries, rollback, and distributed scheduling.
-- [ ] Parallel scheduling, durable task state, and inter-agent messaging.
+- [ ] Durable task state, cross-process messaging, retries, rollback, and distributed scheduling.
 - [ ] Typed image, audio, video, and spatial data contracts.
 - [ ] Streaming and cancellation semantics.
 - [ ] Memory interface with explicit ownership and retention controls.

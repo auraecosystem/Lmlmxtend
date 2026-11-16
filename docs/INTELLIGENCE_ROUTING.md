@@ -37,6 +37,23 @@ discovery may return zero or one provider today. The routing API is deliberately
 separated so future multi-provider selection can be introduced with explicit
 ranking and policy without changing application task intent.
 
+## Goal-planner boundary
+
+The agent-runtime crate exposes a model-agnostic `GoalPlanner` contract. A host
+can implement it with the LMLM processor when that processor has a stable public
+interface. The planner receives a bounded `GoalRequest` and a read-only snapshot
+of registered `AgentDescriptor` values, then returns an `AgentPlan` proposal.
+
+The host executes proposals only through `AgentRuntime::execute_goal`. That
+path validates the concurrency limit and reuses the normal plan scheduler,
+including graph validation, registered-agent preflight, dependency barriers,
+capability checks, input/output limits, cancellation, and deadlines. A planner
+cannot invoke an agent directly through this contract.
+
+No concrete LMLM adapter is included: this repository does not yet contain a
+stable processor API or transport to bind. The contract deliberately avoids
+model-provider dependencies and assumptions about model internals.
+
 ## Scope and limitations
 
 - Discovery is local and read-only; it does not load packages from disk.

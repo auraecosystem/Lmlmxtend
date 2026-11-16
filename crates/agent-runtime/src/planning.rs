@@ -4,9 +4,7 @@
 //! The host remains responsible for validating and executing that plan through
 //! the registered-agent runtime. This module does not invoke a model itself.
 
-use crate::{
-    AgentDescriptor, AgentPlan, AgentRuntime, PlanError, PlanResult, MAX_PARALLEL_TASKS,
-};
+use crate::{AgentDescriptor, AgentPlan, AgentRuntime, PlanError, PlanResult, MAX_PARALLEL_TASKS};
 use lmlmxtend_api::ExecutionContext;
 use lmlmxtend_runtime::Runtime;
 use std::fmt;
@@ -22,7 +20,10 @@ pub struct GoalRequest {
 }
 
 impl GoalRequest {
-    pub fn new(goal_id: impl Into<String>, goal: impl Into<String>) -> Result<Self, GoalPlanningError> {
+    pub fn new(
+        goal_id: impl Into<String>,
+        goal: impl Into<String>,
+    ) -> Result<Self, GoalPlanningError> {
         let goal_id = goal_id.into();
         let goal = goal.into();
         if goal_id.trim().is_empty() || goal_id.len() > 128 {
@@ -138,7 +139,9 @@ impl AgentRuntime {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Agent, AgentContext, AgentError, AgentManifest, AgentResponse, AgentTask, AGENT_API_VERSION};
+    use crate::{
+        Agent, AgentContext, AgentError, AgentManifest, AgentResponse, AgentTask, AGENT_API_VERSION,
+    };
     use lmlmxtend_api::{CancellationToken, CapabilityId};
     use lmlmxtend_core::RuntimeConfig;
     use std::sync::Arc;
@@ -201,7 +204,10 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.goal_id, "goal-1");
-        assert_eq!(result.execution.outputs["execute-goal"].output, "summarize this");
+        assert_eq!(
+            result.execution.outputs["execute-goal"].output,
+            "summarize this"
+        );
     }
 
     #[test]
@@ -241,7 +247,9 @@ mod tests {
         let request = GoalRequest::new("goal-2", "try invalid route").unwrap();
         assert!(matches!(
             agents.execute_goal(&runtime, &InvalidPlanner, &request, &execution_context(), 1),
-            Err(GoalExecutionError::Execution(PlanError::AgentNotRegistered { .. }))
+            Err(GoalExecutionError::Execution(
+                PlanError::AgentNotRegistered { .. }
+            ))
         ));
     }
 

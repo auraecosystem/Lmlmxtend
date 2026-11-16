@@ -132,12 +132,7 @@ impl Runtime {
             .ok_or_else(|| RuntimeError::CapabilityNotDeclared(request.capability.to_string()))?;
         let extension = self.extensions.get(owner)
             .ok_or_else(|| RuntimeError::ExtensionNotFound(owner.clone()))?;
-        let bounded_context = ExecutionContext::new(
-            context.cancellation_token(),
-            // Context exposes its own deadline through checks; output is always capped by host policy.
-            None,
-            context.max_output_bytes().min(self.max_output_bytes),
-        );
+        let bounded_context = context.limited_to_output(self.max_output_bytes);
         let response = extension.execute_with_context(request, &bounded_context)
             .map_err(RuntimeError::Extension)?;
         context.check_cancelled().map_err(|error| match error {
@@ -155,7 +150,7 @@ impl Runtime {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lmlmxtend_api::{ExtensionManifest, ExtensionRequest};
+    use lmlmxtend_api::{CancellationToken, ExecutionContext, ExtensionManifest, ExtensionRequest};
     use std::sync::Arc;
 
     struct Echo;
@@ -262,9 +257,39 @@ mod tests {
         )).is_err());
     }
 
+
+    #[test]
+    fn rejects_pre_cancelled_execution_before_dispatch() {
+        let mut runtime = Runtime::new(RuntimeConfig::default());
+        runtime.register(Arc::new(Echo)).unwrap();
+        let token = CancellationToken::new();
+        token.cancel();
+        let context = ExecutionContext::new(token, None, usize::MAX);
+        let request = ExtensionRequest::new(CapabilityId::new("text.echo").unwrap(), "hello");
+        assert_eq!(runtime.execute_with_context(request, &context), Err(RuntimeError::Cancelled));
+    }
+
+    #[test]
+    fn rejects_expired_deadline_before_dispatch() {
+        let mut runtime = Runtime::new(RuntimeConfig::default());
+        runtime.register(Arc::new(Echo)).unwrap();
+        let context = ExecutionContext::with_timeout(std::time::Duration::ZERO, usize::MAX);
+        let request = ExtensionRequest::new(CapabilityId::new("text.echo").unwrap(), "hello");
+        assert_eq!(runtime.execute_with_context(request, &context), Err(RuntimeError::DeadlineExceeded));
+    }
+
+    #[test]
+    fn enforces_host_output_limit() {
+        let config = RuntimeConfig { max_input_bytes: 32, max_output_bytes: 2, allowed_capabilities: None };
+        let mut runtime = Runtime::new(config);
+        runtime.register(Arc::new(Echo)).unwrap();
+        let request = ExtensionRequest::new(CapabilityId::new("text.echo").unwrap(), "hey");
+        assert_eq!(runtime.execute(request), Err(RuntimeError::OutputTooLarge));
+    }
+
     #[test]
     fn rejects_input_over_configured_limit() {
-        let config = RuntimeConfig { max_input_bytes: 3, allowed_capabilities: None };
+        let config = RuntimeConfig { max_input_bytes: 3, max_output_bytes: 1_048_576, allowed_capabilities: None };
         let mut runtime = Runtime::new(config);
         runtime.register(Arc::new(Echo)).unwrap();
         let request = ExtensionRequest::new(CapabilityId::new("text.echo").unwrap(), "long");

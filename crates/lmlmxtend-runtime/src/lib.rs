@@ -60,6 +60,7 @@ pub struct Runtime {
     policy: ExecutionPolicy,
     max_output_bytes: usize,
     extensions: BTreeMap<String, Arc<dyn Extension>>,
+    descriptors: BTreeMap<String, ExtensionDescriptor>,
     capabilities: BTreeMap<CapabilityId, String>,
 }
 
@@ -69,6 +70,7 @@ impl Runtime {
             policy: ExecutionPolicy::from_config(&config),
             max_output_bytes: config.max_output_bytes,
             extensions: BTreeMap::new(),
+            descriptors: BTreeMap::new(),
             capabilities: BTreeMap::new(),
         }
     }
@@ -93,10 +95,17 @@ impl Runtime {
                 return Err(RuntimeError::DuplicateCapability(capability.to_string()));
             }
         }
+        let descriptor = ExtensionDescriptor {
+            extension_id: manifest.id.clone(),
+            version: manifest.version.clone(),
+            api_version: manifest.api_version,
+            capabilities: manifest.capabilities.clone(),
+        };
         for capability in manifest.capabilities {
             self.capabilities.insert(capability, manifest.id.clone());
         }
-        self.extensions.insert(manifest.id, extension);
+        self.extensions.insert(manifest.id.clone(), extension);
+        self.descriptors.insert(manifest.id, descriptor);
         Ok(())
     }
 
@@ -112,21 +121,14 @@ impl Runtime {
 
     /// Returns stable, read-only metadata for registered extensions.
     pub fn extensions(&self) -> Vec<ExtensionDescriptor> {
-        self.extensions.iter().map(|(id, extension)| {
-            let manifest = extension.manifest();
-            ExtensionDescriptor {
-                extension_id: id.clone(),
-                version: manifest.version,
-                api_version: manifest.api_version,
-                capabilities: manifest.capabilities,
-            }
-        }).collect()
+        self.descriptors.values().cloned().collect()
     }
 
     /// Finds registered providers for an exact capability identifier.
     pub fn discover_capability(&self, capability: &CapabilityId) -> Vec<ExtensionDescriptor> {
-        self.extensions().into_iter()
+        self.descriptors.values()
             .filter(|extension| extension.capabilities.contains(capability))
+            .cloned()
             .collect()
     }
 

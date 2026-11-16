@@ -65,6 +65,72 @@ pub struct ExtensionManifest {
     pub capabilities: Vec<CapabilityId>,
 }
 
+
+/// Cooperative cancellation signal shared by a host and an extension.
+#[derive(Clone, Debug, Default)]
+pub struct CancellationToken(std::sync::Arc<std::sync::atomic::AtomicBool>);
+
+impl CancellationToken {
+    pub fn new() -> Self { Self::default() }
+    pub fn cancel(&self) {
+        self.0.store(true, std::sync::atomic::Ordering::Release);
+    }
+    pub fn is_cancelled(&self) -> bool {
+        self.0.load(std::sync::atomic::Ordering::Acquire)
+    }
+}
+
+/// Per-request execution controls. Deadlines use a monotonic clock and are
+/// therefore process-local; they are not intended for serialization.
+#[derive(Clone, Debug)]
+pub struct ExecutionContext {
+    cancellation: CancellationToken,
+    deadline: Option<std::time::Instant>,
+    max_output_bytes: usize,
+}
+
+impl Default for ExecutionContext {
+    fn default() -> Self {
+        Self { cancellation: CancellationToken::new(), deadline: None, max_output_bytes: usize::MAX }
+    }
+}
+
+impl ExecutionContext {
+    pub fn new(cancellation: CancellationToken, deadline: Option<std::time::Instant>, max_output_bytes: usize) -> Self {
+        Self { cancellation, deadline, max_output_bytes }
+    }
+    pub fn with_timeout(timeout: std::time::Duration, max_output_bytes: usize) -> Self {
+        Self::new(CancellationToken::new(), Some(std::time::Instant::now() + timeout), max_output_bytes)
+    }
+    pub fn cancellation_token(&self) -> CancellationToken { self.cancellation.clone() }
+    pub fn is_cancelled(&self) -> bool { self.cancellation.is_cancelled() }
+    pub fn is_deadline_exceeded(&self) -> bool {
+        self.deadline.is_some_and(|deadline| std::time::Instant::now() >= deadline)
+    }
+    pub fn max_output_bytes(&self) -> usize { self.max_output_bytes }
+    /// Extensions should call this between bounded units of work.
+    pub fn check_cancelled(&self) -> Result<(), ExecutionControlError> {
+        if self.is_cancelled() { return Err(ExecutionControlError::Cancelled); }
+        if self.is_deadline_exceeded() { return Err(ExecutionControlError::DeadlineExceeded); }
+        Ok(())
+    }
+}
+
+/// Host-enforced request lifecycle failures.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ExecutionControlError { Cancelled, DeadlineExceeded, OutputTooLarge }
+
+impl fmt::Display for ExecutionControlError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Cancelled => f.write_str("execution cancelled"),
+            Self::DeadlineExceeded => f.write_str("execution deadline exceeded"),
+            Self::OutputTooLarge => f.write_str("extension output exceeds configured limit"),
+        }
+    }
+}
+impl std::error::Error for ExecutionControlError {}
+
 /// Implement this contract to expose a capability to a LMLMxtend host.
 /// Implementations must document resource limits and treat caller input as untrusted.
 pub trait Extension: Send + Sync {
@@ -75,6 +141,13 @@ pub trait Extension: Send + Sync {
     fn health_check(&self) -> Result<(), ExtensionError> { Ok(()) }
 
     fn execute(&self, request: ExtensionRequest) -> Result<ExtensionResponse, ExtensionError>;
+
+    /// Context-aware execution. The default preserves compatibility but cannot
+    /// interrupt legacy implementations; cooperative extensions should override it.
+    fn execute_with_context(&self, request: ExtensionRequest, context: &ExecutionContext) -> Result<ExtensionResponse, ExtensionError> {
+        context.check_cancelled().map_err(|error| ExtensionError::ExecutionFailed(error.to_string()))?;
+        self.execute(request)
+    }
 }
 
 /// Errors that can be returned by an extension.

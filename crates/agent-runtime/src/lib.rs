@@ -174,6 +174,14 @@ impl<'a> AgentContext<'a> {
         target_agent: &str,
         task: AgentTask,
     ) -> Result<AgentResponse, AgentError> {
+        let task = if task.correlation_id.is_none() {
+            match &self.correlation_id {
+                Some(id) => task.with_correlation_id(id.clone()),
+                None => task,
+            }
+        } else {
+            task
+        };
         self.agent_runtime.execute_inner(
             self.runtime,
             target_agent,
@@ -202,8 +210,10 @@ impl AgentRuntime {
     /// Validate and register an agent. The manifest is snapshotted at registration.
     pub fn register(&mut self, agent: Arc<dyn Agent>) -> Result<(), AgentError> {
         let manifest = agent.manifest();
-        if manifest.id.trim().is_empty() || manifest.version.trim().is_empty() {
-            return Err(AgentError::InvalidManifest("id and version are required".into()));
+        if !valid_agent_id(&manifest.id) || manifest.version.trim().is_empty() {
+            return Err(AgentError::InvalidManifest(
+                "id must be a lowercase namespaced identifier and version is required".into()
+            ));
         }
         if manifest.api_version != AGENT_API_VERSION {
             return Err(AgentError::InvalidManifest("incompatible agent API version".into()));
@@ -289,6 +299,17 @@ impl AgentRuntime {
         }
         Ok(response)
     }
+}
+
+fn valid_agent_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 128
+        && id.split('.').all(|part| {
+            !part.is_empty()
+                && part.chars().all(|c| {
+                    c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_'
+                })
+        })
 }
 
 fn map_lifecycle_error(error: lmlmxtend_api::ExecutionControlError) -> AgentError {
@@ -419,6 +440,17 @@ mod tests {
         agents.register(Arc::new(DelegatingAgent)).unwrap();
         let result = agents.execute(&empty_runtime(), "agent.parent", AgentTask::new("t2", "delegated"), &execution()).unwrap();
         assert_eq!(result.output, "delegated");
+    }
+
+    #[test]
+    fn rejects_invalid_agent_identity() {
+        let mut agents = AgentRuntime::default();
+        assert_eq!(
+            agents.register(Arc::new(EchoAgent { id: "Invalid Agent" })),
+            Err(AgentError::InvalidManifest(
+                "id must be a lowercase namespaced identifier and version is required".into()
+            ))
+        );
     }
 
     #[test]

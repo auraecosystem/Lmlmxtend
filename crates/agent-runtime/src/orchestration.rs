@@ -4,14 +4,18 @@
 //! define execution order; task inputs remain explicit and are not implicitly
 //! rewritten with predecessor output.
 
+use crate::coordination::AgentCoordination;
 use crate::{AgentError, AgentResponse, AgentRuntime, AgentTask};
 use lmlmxtend_api::ExecutionContext;
 use lmlmxtend_runtime::Runtime;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
+use std::thread;
 
 /// Maximum number of nodes accepted in one in-memory plan.
 pub const MAX_PLAN_NODES: usize = 256;
+/// Hard ceiling for concurrent in-process agent invocations.
+pub const MAX_PARALLEL_TASKS: usize = 32;
 
 /// One agent invocation in a plan.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -169,6 +173,8 @@ pub enum PlanError {
     MissingDependency { node_id: String, dependency: String },
     CycleDetected,
     AgentNotRegistered { node_id: String, agent_id: String },
+    InvalidConcurrency,
+    AgentPanicked { node_id: String },
     AgentFailed { node_id: String, source: AgentError },
 }
 
@@ -196,6 +202,8 @@ impl fmt::Display for PlanError {
                 f,
                 "plan node '{node_id}' references unregistered agent '{agent_id}'"
             ),
+            Self::InvalidConcurrency => write!(f, "parallel task limit must be between 1 and {MAX_PARALLEL_TASKS}"),
+            Self::AgentPanicked { node_id } => write!(f, "agent task '{node_id}' panicked"),
             Self::AgentFailed { node_id, source } => {
                 write!(f, "agent task '{node_id}' failed: {source}")
             }
@@ -205,48 +213,159 @@ impl fmt::Display for PlanError {
 
 impl std::error::Error for PlanError {}
 
+impl AgentPlan {
+    /// Return dependency waves. Every node in a wave has all dependencies
+    /// completed in earlier waves; IDs within each wave are lexical.
+    pub fn execution_waves(&self) -> Result<Vec<Vec<String>>, PlanError> {
+        self.execution_order()?;
+        let nodes: BTreeMap<&str, &PlanNode> =
+            self.nodes.iter().map(|node| (node.id.as_str(), node)).collect();
+        let mut remaining: BTreeSet<String> =
+            self.nodes.iter().map(|node| node.id.clone()).collect();
+        let mut completed = BTreeSet::new();
+        let mut waves = Vec::new();
+
+        while !remaining.is_empty() {
+            let ready: Vec<String> = remaining
+                .iter()
+                .filter(|id| {
+                    nodes[id.as_str()]
+                        .depends_on
+                        .iter()
+                        .all(|dependency| completed.contains(dependency))
+                })
+                .cloned()
+                .collect();
+            if ready.is_empty() {
+                return Err(PlanError::CycleDetected);
+            }
+            for id in &ready {
+                remaining.remove(id);
+                completed.insert(id.clone());
+            }
+            waves.push(ready);
+        }
+        Ok(waves)
+    }
+}
+
 impl AgentRuntime {
-    /// Validate the complete plan before invoking any agent, then execute its
-    /// nodes sequentially in deterministic topological order. Stops on first
-    /// failure; successful earlier node outputs are returned only on success.
+    /// Execute a validated plan sequentially in dependency-wave order.
     pub fn execute_plan(
         &self,
         runtime: &Runtime,
         plan: &AgentPlan,
         execution: &ExecutionContext,
     ) -> Result<PlanResult, PlanError> {
-        let order = plan.execution_order()?;
+        self.execute_plan_parallel(runtime, plan, execution, 1)
+    }
+
+    /// Execute independent nodes concurrently, with at most
+    /// `max_parallel_tasks` in flight. Dependencies are synchronization
+    /// barriers between waves. A failed batch prevents later waves from starting.
+    /// Already-started peers in the failing batch are joined before returning.
+    pub fn execute_plan_parallel(
+        &self,
+        runtime: &Runtime,
+        plan: &AgentPlan,
+        execution: &ExecutionContext,
+        max_parallel_tasks: usize,
+    ) -> Result<PlanResult, PlanError> {
+        if max_parallel_tasks == 0 || max_parallel_tasks > MAX_PARALLEL_TASKS {
+            return Err(PlanError::InvalidConcurrency);
+        }
+
+        let waves = plan.execution_waves()?;
         let nodes: BTreeMap<&str, &PlanNode> = plan
             .nodes()
             .iter()
             .map(|node| (node.id.as_str(), node))
             .collect();
-        // Preflight every agent reference before running any user code.
-        for node_id in &order {
-            let node = nodes.get(node_id.as_str()).expect("validated node exists");
-            if !self.agents.contains_key(&node.agent_id) {
-                return Err(PlanError::AgentNotRegistered {
-                    node_id: node.id.clone(),
-                    agent_id: node.agent_id.clone(),
-                });
+
+        // Preflight the entire plan before invoking any agent.
+        for wave in &waves {
+            for node_id in wave {
+                let node = nodes.get(node_id.as_str()).expect("validated node exists");
+                if !self.agents.contains_key(&node.agent_id) {
+                    return Err(PlanError::AgentNotRegistered {
+                        node_id: node.id.clone(),
+                        agent_id: node.agent_id.clone(),
+                    });
+                }
             }
         }
 
+        let coordination = AgentCoordination::new(self.agents.keys().cloned().collect());
         let mut outputs = BTreeMap::new();
+        let mut execution_order = Vec::with_capacity(plan.nodes().len());
 
-        for node_id in &order {
-            let node = nodes.get(node_id.as_str()).expect("validated node exists");
-            let response = self
-                .execute(runtime, &node.agent_id, node.task.clone(), execution)
-                .map_err(|source| PlanError::AgentFailed {
-                    node_id: node.id.clone(),
-                    source,
-                })?;
-            outputs.insert(node.id.clone(), response);
+        for wave in waves {
+            for batch in wave.chunks(max_parallel_tasks) {
+                let batch_results = thread::scope(|scope| {
+                    let handles: Vec<_> = batch
+                        .iter()
+                        .map(|node_id| {
+                            let node = nodes
+                                .get(node_id.as_str())
+                                .expect("validated node exists");
+                            let id = node.id.clone();
+                            let agent_id = node.agent_id.clone();
+                            let task = node.task.clone();
+                            let coordination = coordination.clone();
+                            let handle = scope.spawn(move || {
+                                self.execute_inner(
+                                    runtime,
+                                    &agent_id,
+                                    task,
+                                    execution,
+                                    Vec::new(),
+                                    coordination,
+                                )
+                            });
+                            (id, handle)
+                        })
+                        .collect();
+
+                    handles
+                        .into_iter()
+                        .map(|(node_id, handle)| match handle.join() {
+                            Ok(result) => (node_id, result),
+                            Err(_) => (node_id, Err(AgentError::ExecutionFailed(
+                                "agent thread panicked".into(),
+                            ))),
+                        })
+                        .collect::<Vec<_>>()
+                });
+
+                let mut first_error = None;
+                for (node_id, result) in batch_results {
+                    execution_order.push(node_id.clone());
+                    match result {
+                        Ok(response) => {
+                            outputs.insert(node_id, response);
+                        }
+                        Err(AgentError::ExecutionFailed(message))
+                            if message == "agent thread panicked" =>
+                        {
+                            if first_error.is_none() {
+                                first_error = Some(PlanError::AgentPanicked { node_id });
+                            }
+                        }
+                        Err(source) => {
+                            if first_error.is_none() {
+                                first_error = Some(PlanError::AgentFailed { node_id, source });
+                            }
+                        }
+                    }
+                }
+                if let Some(error) = first_error {
+                    return Err(error);
+                }
+            }
         }
 
         Ok(PlanResult {
-            execution_order: order,
+            execution_order,
             outputs,
         })
     }

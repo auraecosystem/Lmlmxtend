@@ -259,6 +259,18 @@ mod tests {
     }
 
     #[test]
+    fn discovers_registered_extension_metadata_by_capability() {
+        let mut runtime = Runtime::new(RuntimeConfig::default());
+        runtime.register(Arc::new(Echo)).unwrap();
+        let capability = CapabilityId::new("text.echo").unwrap();
+        let providers = runtime.discover_capability(&capability);
+        assert_eq!(providers.len(), 1);
+        assert_eq!(providers[0].extension_id, "example.echo");
+        assert_eq!(providers[0].api_version, lmlmxtend_api::API_VERSION);
+        assert_eq!(providers[0].capabilities, vec![capability]);
+    }
+
+    #[test]
     fn registers_and_dispatches_declared_capability() {
         let mut runtime = Runtime::new(RuntimeConfig::default());
         runtime.register(Arc::new(Echo)).unwrap();

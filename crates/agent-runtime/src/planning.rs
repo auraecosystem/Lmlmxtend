@@ -309,7 +309,7 @@ mod tests {
                 &OversizedPlanner,
                 &request,
                 &execution_context(),
-                1
+                1,
             ),
             Err(GoalExecutionError::Planning(GoalPlanningError::PlanTooLarge))
         );

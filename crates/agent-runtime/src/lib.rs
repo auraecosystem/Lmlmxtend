@@ -432,6 +432,21 @@ mod tests {
     }
 
     #[test]
+    fn enforces_delegation_depth_limit() {
+        let mut agents = AgentRuntime::new(AgentRuntimeConfig {
+            max_task_input_bytes: 1024,
+            max_task_output_bytes: 1024,
+            max_delegation_depth: 0,
+        });
+        agents.register(Arc::new(EchoAgent { id: "agent.echo" })).unwrap();
+        agents.register(Arc::new(DelegatingAgent)).unwrap();
+        assert_eq!(
+            agents.execute(&empty_runtime(), "agent.parent", AgentTask::new("t-depth", "hello"), &execution()),
+            Err(AgentError::DelegationDepthExceeded)
+        );
+    }
+
+    #[test]
     fn enforces_declared_capabilities_for_agent() {
         let mut agents = AgentRuntime::default();
         agents.register(Arc::new(CapabilityAgent)).unwrap();

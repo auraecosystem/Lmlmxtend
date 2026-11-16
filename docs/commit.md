@@ -153,3 +153,43 @@ The LMLM processor bridge remains dependent on inspecting the actual LMLM implem
 - Added regression coverage for cancellation, deadlines, and output limits.
 - Documented that synchronous legacy extensions cannot be forcibly interrupted and that CPU/memory isolation remains future work.
 - Rust compilation and tests remain unverified until a Rust toolchain or CI run is available.
+
+Pushed to main
+
+Continued development of LMLMxtend. The execution-lifecycle milestone now has its first implementation.
+
+Repository: auraecosystem/Lmlmxtend⁠￼
+
+Implemented
+
+* Cancellation tokens — host and extensions can share a thread-safe cancellation signal.
+* Request deadlines — monotonic deadlines can be checked before, during cooperative execution, and after execution.
+* Context-aware extensions — added execute_with_context() while retaining the existing execute() contract.
+* Output limits — host-enforced maximum response size.
+* Structured lifecycle errors — cancellation, deadline expiration and oversized output have distinct runtime errors.
+* Regression tests — added coverage for pre-cancelled requests, expired deadlines and output limits.
+* Security documentation — clarified what the runtime can and cannot enforce.
+* Roadmap — updated completed and outstanding work.
+
+Commits
+
+Latest commit:
+
+80386cbc7a7c6d009b3b510674771e5fa3057403
+
+The changes were pushed as a sequence of commits, preserving the existing repository history.
+
+Important limitations
+
+* Legacy synchronous extensions cannot be forcibly interrupted while executing. Extensions must cooperate by checking their execution context.
+* Output size is checked after execution; this does not prevent excessive memory allocation before a response is returned.
+* CPU limits, memory quotas, concurrency accounting and process isolation remain outstanding.
+* The LMLM processor bridge remains deferred until the actual LMLM implementation is inspected.
+
+Verification
+
+Build verification outstanding
+
+The latest source files and commit history were fetched and verified on main. GitHub reported no workflow runs for the latest commit. This environment also lacks the Rust compiler and Cargo, so I cannot honestly report successful compilation or tests.
+
+Next development target: tracing and observability, followed by isolated extension execution and resource quotas.

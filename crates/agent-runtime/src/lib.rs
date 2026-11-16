@@ -135,7 +135,7 @@ pub struct AgentDescriptor {
 /// Host-provided execution context. Capability access is checked against the
 /// registered agent manifest on every call.
 pub struct AgentContext<'a> {
-    agent_id: &'a str,
+    agent_id: String,
     runtime: &'a Runtime,
     agent_runtime: &'a AgentRuntime,
     allowed_capabilities: &'a BTreeSet<CapabilityId>,
@@ -145,7 +145,7 @@ pub struct AgentContext<'a> {
 }
 
 impl<'a> AgentContext<'a> {
-    pub fn agent_id(&self) -> &str { self.agent_id }
+    pub fn agent_id(&self) -> &str { &self.agent_id }
 
     pub fn execution_context(&self) -> &ExecutionContext { self.execution }
 
@@ -278,7 +278,7 @@ impl AgentRuntime {
         let allowed: BTreeSet<CapabilityId> = entry.manifest.capabilities.iter().cloned().collect();
         delegation_stack.push(agent_id.to_owned());
         let context = AgentContext {
-            agent_id,
+            agent_id: agent_id.to_owned(),
             runtime,
             agent_runtime: self,
             allowed_capabilities: &allowed,

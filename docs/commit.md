@@ -280,3 +280,132 @@ Compilation pending
 * No GitHub Actions run was reported yet.
 
 My recommendation for the next milestone: build the Extension Intelligence Layer — extensions should be able to declare capabilities, discover compatible extensions, negotiate tasks and cooperate through controlled execution. That is where LMLMxtend starts becoming an extended-intelligence platform rather than just a plugin framework.
+Implemented and pushed to GitHub
+
+The next LMLMxtend milestone is now implemented: Capability Intelligence and Task Routing.
+
+Repository: auraecosystem/Lmlmxtend⁠￼
+
+1. New intelligence crate
+
+lmlmxtend-intelligence
+
+Added
+
+A dedicated intelligence layer that discovers extensions, checks compatibility, plans tasks and dispatches execution through the runtime.
+
+New files:
+
+crates/
+└── intelligence/
+    ├── Cargo.toml
+    └── src/
+        └── lib.rs
+
+2. What it can do
+
+* Capability discovery: find extensions that provide a requested capability.
+* Compatibility negotiation: verify extension API versions.
+* Task planning: create explicit execution plans.
+* Provider preference: select a requested extension or fail clearly if unavailable.
+* Task dispatch: execute through the existing runtime.
+* Lifecycle propagation: support cancellation and deadlines.
+* Correlation IDs: associate execution requests with application tasks.
+
+Example
+
+use lmlmxtend_api::CapabilityId;
+use lmlmxtend_intelligence::{IntelligenceRouter, TaskIntent};
+let router = IntelligenceRouter;
+let intent = TaskIntent::new(
+    CapabilityId::new("creative.compose")?,
+    "Create a cinematic scene"
+);
+let plan = router.plan(&runtime, &intent)?;
+let response = router.execute(&runtime, intent)?;
+
+This is actual capability-based routing, not an AI model pretending to understand a task. Semantic reasoning and LMLM processor integration remain future work.
+
+3. Updated architecture
+
+LMLMxtend/
+├── crates/
+│   ├── lmlmxtend-core/
+│   ├── lmlmxtend-api/
+│   ├── lmlmxtend-runtime/
+│   ├── intelligence/          NEW
+│   ├── extension-forge/
+│   ├── multimodal/            PLANNED
+│   ├── agent-runtime/         PLANNED
+│   ├── execution/             PLANNED
+│   └── security/              PLANNED
+├── extensions/
+│   ├── creative/
+│   ├── language/
+│   ├── vision/
+│   ├── audio/
+│   ├── spatial/
+│   └── agents/
+├── adapters/
+├── sdk/
+├── protocols/
+├── tests/
+├── examples/
+├── benchmarks/
+└── docs/
+    ├── ARCHITECTURE.md
+    ├── INTELLIGENCE_ROUTING.md
+    ├── EXTENSION_FORGE.md
+    ├── SECURITY.md
+    └── ROADMAP.md
+
+The planned directories are documented as future boundaries; they are not being represented as implemented modules.
+
+4. Tests added
+
+Five intelligence tests cover:
+
+* Discovering a capability provider.
+* Planning and executing a task.
+* Rejecting missing providers.
+* Rejecting incompatible API versions.
+* Respecting explicit provider preferences.
+
+A runtime regression test also covers public capability discovery.
+
+5. Commits
+
+Change	Commit
+Intelligence router	c35af94
+Lifecycle context propagation	eea3960
+Workspace correction	9475bff
+Routing documentation	bb0871d
+Runtime discovery tests	5f8c933
+Manifest snapshot correction	28177d3
+Architecture update	bf69fc0
+
+The repository’s subsequent bash.sh commit was preserved.
+
+6. Verification
+
+Rust tests pending
+
+* Workspace membership verified.
+* Source and documentation fetched from GitHub.
+* Manifest snapshots now remain stable after registration.
+* No GitHub Actions run was available for the latest commit.
+* Cargo compilation and tests have not been confirmed.
+
+Next milestone
+
+My recommendation is to build the Multi-Agent Runtime next:
+
+* Agents with independent identities and capabilities.
+* Task decomposition and delegation.
+* Agent-to-agent communication.
+* Shared task state and controlled memory.
+* Cooperative execution and cancellation.
+* Permission-aware tool access.
+* LMLM as the underlying intelligence processor.
+
+That would move LMLMxtend toward a genuine local extended-intelligence runtime, while keeping LMLM as the neural intelligence core.

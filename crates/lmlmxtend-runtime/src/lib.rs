@@ -2,7 +2,7 @@
 
 use lmlmxtend_api::{CapabilityId, Extension, ExtensionError, ExtensionManifest, ExtensionRequest, ExtensionResponse};
 use lmlmxtend_core::{ExecutionPolicy, PolicyDecision, RuntimeConfig};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -43,8 +43,11 @@ impl Runtime {
         if self.extensions.contains_key(&manifest.id) {
             return Err(RuntimeError::DuplicateExtension(manifest.id));
         }
+        // Validate the complete manifest before mutating runtime state. This also
+        // catches duplicate declarations inside a single manifest.
+        let mut declared = BTreeSet::new();
         for capability in &manifest.capabilities {
-            if self.capabilities.contains_key(capability) {
+            if !declared.insert(capability.clone()) || self.capabilities.contains_key(capability) {
                 return Err(RuntimeError::DuplicateCapability(capability.to_string()));
             }
         }
@@ -101,6 +104,38 @@ mod tests {
         runtime.register(Arc::new(Echo)).unwrap();
         let request = ExtensionRequest::new(CapabilityId::new("text.echo").unwrap(), "hello");
         assert_eq!(runtime.execute(request).unwrap().output, "hello");
+    }
+
+    #[test]
+    fn rejects_duplicate_capabilities_within_one_manifest() {
+        struct DuplicateCapability;
+
+        impl Extension for DuplicateCapability {
+            fn manifest(&self) -> ExtensionManifest {
+                let capability = CapabilityId::new("text.echo").unwrap();
+                ExtensionManifest {
+                    id: "example.duplicate".into(),
+                    version: "0.1.0".into(),
+                    api_version: lmlmxtend_api::API_VERSION,
+                    capabilities: vec![capability.clone(), capability],
+                }
+            }
+
+            fn execute(&self, request: ExtensionRequest) -> Result<ExtensionResponse, ExtensionError> {
+                Ok(ExtensionResponse::text(request.input))
+            }
+        }
+
+        let mut runtime = Runtime::new(RuntimeConfig::default());
+        assert_eq!(
+            runtime.register(Arc::new(DuplicateCapability)),
+            Err(RuntimeError::DuplicateCapability("text.echo".into()))
+        );
+        // Failed registration is atomic: the rejected extension owns no capability.
+        assert!(runtime.execute(ExtensionRequest::new(
+            CapabilityId::new("text.echo").unwrap(),
+            "hello"
+        )).is_err());
     }
 
     #[test]

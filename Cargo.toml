@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/lmlmxtend-api",
+    "crates/lmlmxtend-core",
+    "crates/lmlmxtend-runtime",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Seriki Walter Yakub"]
+repository = "https://github.com/auraecosystem/Lmlmxtend"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"

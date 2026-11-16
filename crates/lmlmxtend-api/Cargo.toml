@@ -1,0 +1,9 @@
+[package]
+name = "lmlmxtend-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Versioned extension and capability contracts for LMLMxtend"
+
+[dependencies]

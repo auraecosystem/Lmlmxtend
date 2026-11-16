@@ -1,0 +1,10 @@
+[package]
+name = "lmlmxtend-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Core configuration and execution policy for LMLMxtend"
+
+[dependencies]
+lmlmxtend-api = { path = "../lmlmxtend-api" }

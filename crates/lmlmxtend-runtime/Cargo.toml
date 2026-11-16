@@ -1,0 +1,15 @@
+[package]
+name = "lmlmxtend-runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "In-process extension registry and dispatcher for LMLMxtend"
+
+[dependencies]
+lmlmxtend-api = { path = "../lmlmxtend-api" }
+lmlmxtend-core = { path = "../lmlmxtend-core" }
+
+[[example]]
+name = "basic_extension"
+path = "examples/basic_extension.rs"

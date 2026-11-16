@@ -58,7 +58,7 @@ The `lmlmxtend-intelligence` crate plans tasks against read-only runtime discove
 
 ## Multi-agent orchestration
 
-The `lmlmxtend-agent-runtime` crate registers versioned agent identities with explicit capability grants. It bounds task input/output, propagates cancellation and deadlines, and supports synchronous nested delegation with cycle and depth checks. Its deterministic task-graph scheduler validates dependency DAGs before executing nodes in stable topological order, sequentially and fail-fast. Agent capability calls pass through the intelligence router and extension runtime. Agents are trusted in-process code, not sandboxed workers. See [Agent Runtime](AGENT_RUNTIME.md).
+The `lmlmxtend-agent-runtime` crate registers versioned agent identities with explicit capability grants. It bounds task input/output, propagates cancellation and deadlines, and supports synchronous nested delegation with cycle and depth checks. Its deterministic task-graph scheduler validates dependency DAGs before executing dependency waves in stable order, with bounded parallel batches and fail-fast handling. Goal planners can propose task graphs through a model-agnostic contract; the host validates every proposal and retains control of agent registration, capability checks, and execution. Agent capability calls pass through the intelligence router and extension runtime. Agents are trusted in-process code, not sandboxed workers. See [Agent Runtime](AGENT_RUNTIME.md).
 
 ## Extension authoring
 

@@ -27,6 +27,8 @@ Application (Olgin or another host)
               |
         LMLMxtend SDK
               |
+   Intelligence router
+              |
      LMLMxtend runtime
         /         \
   Extension API   LMLM bridge

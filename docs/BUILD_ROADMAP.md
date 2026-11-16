@@ -565,3 +565,30 @@ Verification status
 View the GitHub Actions run⁠￼.
 
 Next engineering milestone: parallel agent execution with bounded concurrency, shared task state and explicit inter-agent communication—after the current sequential scheduler passes CI.
+The latest repository confirms that LMLMxtend has an agent runtime and deterministic capability router, but no actual LMLM processor interface yet. I’m implementing the next safe step: a model-agnostic goal-planning boundary that lets an LMLM adapter propose agent tasks while the host retains authority over registered agents, permissions, graph validation, and execution limits. This avoids pretending a live model connection exists when the repository does not yet define one.
+
+Implemented the goal-planning integration boundary in auraecosystem/Lmlmxtend.
+
+What was added
+
+* GoalRequest — bounded natural-language goal input, with a 64 KiB limit.
+* GoalPlanner — a Rust trait that an LMLM processor adapter can implement.
+* Agent discovery — planners receive a read-only list of registered agents and their declared capabilities.
+* execute_goal() — turns a planner proposal into execution through the existing guarded scheduler.
+* Validation — rejects invalid concurrency, unregistered agents, and invalid execution plans before agent invocation.
+* Tests — covers successful planning, invalid goals, unsafe proposals, and concurrency validation.
+* Documentation — updated the agent runtime, intelligence routing, and roadmap.
+
+Repository status
+
+* Open pull request #2⁠￼
+* View implementation⁠￼
+* View CI run⁠￼
+
+The first CI attempt exposed Rust formatting differences. I corrected them and triggered another run. I won’t claim Clippy or tests passed until that run confirms it.
+
+Important remaining boundary
+
+This is not yet a live LMLM connection. The repository still needs a stable processor-facing API or transport. The new interface makes that integration possible without introducing an external model provider or allowing model-generated plans to bypass runtime security.
+
+Next milestone: connect the actual LMLM processor to GoalPlanner, then implement semantic task decomposition, capability-aware agent assignment, and coordinated result synthesis.

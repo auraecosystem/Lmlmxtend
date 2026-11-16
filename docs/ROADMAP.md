@@ -37,6 +37,7 @@
 - [x] Deterministic capability discovery and task planning (single-provider registry).
 - [ ] Multi-provider ranking and semantic task orchestration.
 - [x] Initial synchronous agent lifecycle and nested task delegation with cycle/depth limits.
+- [x] Deterministic DAG validation, topological ordering, and sequential fail-fast agent-plan execution.
 - [ ] Parallel scheduling, durable task state, and inter-agent messaging.
 - [ ] Typed image, audio, video, and spatial data contracts.
 - [ ] Streaming and cancellation semantics.

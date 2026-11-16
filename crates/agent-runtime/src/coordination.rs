@@ -20,16 +20,14 @@ impl AgentSharedState {
     pub fn set(&self, key: impl Into<String>, value: impl Into<String>) -> Result<(), AgentError> {
         let key = key.into();
         let value = value.into();
-        if key.trim().is_empty()
-            || key.len() > 256
-            || value.len() > MAX_SHARED_VALUE_BYTES
-        {
+        if key.trim().is_empty() || key.len() > 256 || value.len() > MAX_SHARED_VALUE_BYTES {
             return Err(AgentError::SharedStateLimitExceeded);
         }
 
-        let mut values = self.values.lock().map_err(|_| {
-            AgentError::ExecutionFailed("shared task state lock poisoned".into())
-        })?;
+        let mut values = self
+            .values
+            .lock()
+            .map_err(|_| AgentError::ExecutionFailed("shared task state lock poisoned".into()))?;
         if !values.contains_key(&key) && values.len() >= MAX_SHARED_STATE_ENTRIES {
             return Err(AgentError::SharedStateLimitExceeded);
         }
@@ -38,16 +36,18 @@ impl AgentSharedState {
     }
 
     pub fn get(&self, key: &str) -> Result<Option<String>, AgentError> {
-        let values = self.values.lock().map_err(|_| {
-            AgentError::ExecutionFailed("shared task state lock poisoned".into())
-        })?;
+        let values = self
+            .values
+            .lock()
+            .map_err(|_| AgentError::ExecutionFailed("shared task state lock poisoned".into()))?;
         Ok(values.get(key).cloned())
     }
 
     pub fn snapshot(&self) -> Result<BTreeMap<String, String>, AgentError> {
-        let values = self.values.lock().map_err(|_| {
-            AgentError::ExecutionFailed("shared task state lock poisoned".into())
-        })?;
+        let values = self
+            .values
+            .lock()
+            .map_err(|_| AgentError::ExecutionFailed("shared task state lock poisoned".into()))?;
         Ok(values.clone())
     }
 }
@@ -90,9 +90,10 @@ impl AgentMessageBus {
         if message.payload.len() > MAX_MESSAGE_BYTES {
             return Err(AgentError::MessageTooLarge);
         }
-        let mut queues = self.queues.lock().map_err(|_| {
-            AgentError::ExecutionFailed("agent message queue lock poisoned".into())
-        })?;
+        let mut queues = self
+            .queues
+            .lock()
+            .map_err(|_| AgentError::ExecutionFailed("agent message queue lock poisoned".into()))?;
         if queues.queued >= MAX_QUEUED_MESSAGES {
             return Err(AgentError::MessageQueueFull);
         }
@@ -106,9 +107,10 @@ impl AgentMessageBus {
     }
 
     pub(crate) fn receive(&self, agent_id: &str) -> Result<Vec<AgentMessage>, AgentError> {
-        let mut queues = self.queues.lock().map_err(|_| {
-            AgentError::ExecutionFailed("agent message queue lock poisoned".into())
-        })?;
+        let mut queues = self
+            .queues
+            .lock()
+            .map_err(|_| AgentError::ExecutionFailed("agent message queue lock poisoned".into()))?;
         let messages = queues.by_agent.remove(agent_id).unwrap_or_default();
         queues.queued = queues.queued.saturating_sub(messages.len());
         Ok(messages.into_iter().collect())

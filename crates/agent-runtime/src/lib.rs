@@ -11,8 +11,8 @@ use std::fmt;
 use std::sync::Arc;
 
 mod coordination;
-pub use coordination::{AgentMessage, AgentMessageBus, AgentSharedState};
 use coordination::AgentCoordination;
+pub use coordination::{AgentMessage, AgentMessageBus, AgentSharedState};
 
 /// Agent contract version. Independent from extension API versioning.
 pub const AGENT_API_VERSION: u16 = 1;
@@ -189,7 +189,11 @@ impl<'a> AgentContext<'a> {
 
     /// Send a bounded message to another registered agent. The recipient can
     /// drain messages when it next runs; message delivery is in-process only.
-    pub fn send_message(&self, target_agent: &str, payload: impl Into<String>) -> Result<(), AgentError> {
+    pub fn send_message(
+        &self,
+        target_agent: &str,
+        payload: impl Into<String>,
+    ) -> Result<(), AgentError> {
         self.coordination.message_bus.send(AgentMessage {
             from_agent_id: self.agent_id.clone(),
             to_agent_id: target_agent.to_owned(),

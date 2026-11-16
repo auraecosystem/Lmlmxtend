@@ -202,7 +202,10 @@ impl fmt::Display for PlanError {
                 f,
                 "plan node '{node_id}' references unregistered agent '{agent_id}'"
             ),
-            Self::InvalidConcurrency => write!(f, "parallel task limit must be between 1 and {MAX_PARALLEL_TASKS}"),
+            Self::InvalidConcurrency => write!(
+                f,
+                "parallel task limit must be between 1 and {MAX_PARALLEL_TASKS}"
+            ),
             Self::AgentPanicked { node_id } => write!(f, "agent task '{node_id}' panicked"),
             Self::AgentFailed { node_id, source } => {
                 write!(f, "agent task '{node_id}' failed: {source}")
@@ -218,8 +221,11 @@ impl AgentPlan {
     /// completed in earlier waves; IDs within each wave are lexical.
     pub fn execution_waves(&self) -> Result<Vec<Vec<String>>, PlanError> {
         self.execution_order()?;
-        let nodes: BTreeMap<&str, &PlanNode> =
-            self.nodes.iter().map(|node| (node.id.as_str(), node)).collect();
+        let nodes: BTreeMap<&str, &PlanNode> = self
+            .nodes
+            .iter()
+            .map(|node| (node.id.as_str(), node))
+            .collect();
         let mut remaining: BTreeSet<String> =
             self.nodes.iter().map(|node| node.id.clone()).collect();
         let mut completed = BTreeSet::new();
@@ -305,9 +311,7 @@ impl AgentRuntime {
                     let handles: Vec<_> = batch
                         .iter()
                         .map(|node_id| {
-                            let node = nodes
-                                .get(node_id.as_str())
-                                .expect("validated node exists");
+                            let node = nodes.get(node_id.as_str()).expect("validated node exists");
                             let id = node.id.clone();
                             let agent_id = node.agent_id.clone();
                             let task = node.task.clone();
@@ -330,9 +334,10 @@ impl AgentRuntime {
                         .into_iter()
                         .map(|(node_id, handle)| match handle.join() {
                             Ok(result) => (node_id, result),
-                            Err(_) => (node_id, Err(AgentError::ExecutionFailed(
-                                "agent thread panicked".into(),
-                            ))),
+                            Err(_) => (
+                                node_id,
+                                Err(AgentError::ExecutionFailed("agent thread panicked".into())),
+                            ),
                         })
                         .collect::<Vec<_>>()
                 });
@@ -527,7 +532,10 @@ mod tests {
             ) -> Result<AgentResponse, AgentError> {
                 let messages = context.receive_messages()?;
                 let value = context.shared_state().get("result")?.unwrap_or_default();
-                Ok(AgentResponse::text(format!("{}:{value}", messages[0].payload)))
+                Ok(AgentResponse::text(format!(
+                    "{}:{value}",
+                    messages[0].payload
+                )))
             }
         }
 

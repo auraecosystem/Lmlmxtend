@@ -1,6 +1,6 @@
 //! Minimal in-process extension host. This is not an isolation boundary.
 
-use lmlmxtend_api::{CapabilityId, Extension, ExtensionError, ExtensionManifest, ExtensionRequest, ExtensionResponse};
+use lmlmxtend_api::{CapabilityId, ExecutionContext, Extension, ExtensionError, ExtensionManifest, ExtensionRequest, ExtensionResponse};
 use lmlmxtend_core::{ExecutionPolicy, PolicyDecision, RuntimeConfig};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
@@ -13,6 +13,9 @@ pub enum RuntimeError {
     ExtensionNotFound(String),
     CapabilityNotDeclared(String),
     PolicyDenied,
+    Cancelled,
+    DeadlineExceeded,
+    OutputTooLarge,
     Extension(ExtensionError),
     InvalidManifest(String),
 }
@@ -25,6 +28,9 @@ impl fmt::Display for RuntimeError {
             Self::ExtensionNotFound(id) => write!(f, "extension not found: {id}"),
             Self::CapabilityNotDeclared(id) => write!(f, "capability not declared: {id}"),
             Self::PolicyDenied => f.write_str("request denied by runtime policy"),
+            Self::Cancelled => f.write_str("execution cancelled"),
+            Self::DeadlineExceeded => f.write_str("execution deadline exceeded"),
+            Self::OutputTooLarge => f.write_str("extension output exceeds configured limit"),
             Self::Extension(error) => write!(f, "{error}"),
             Self::InvalidManifest(reason) => write!(f, "invalid extension manifest: {reason}"),
         }
@@ -50,7 +56,7 @@ pub struct Runtime {
 impl Runtime {
     pub fn new(config: RuntimeConfig) -> Self {
         Self {
-            policy: ExecutionPolicy::from_config(&config),
+            policy: ExecutionPolicy::from_config(&config),\n            max_output_bytes: config.max_output_bytes,
             extensions: BTreeMap::new(),
             capabilities: BTreeMap::new(),
         }
@@ -99,6 +105,23 @@ impl Runtime {
     /// Dispatches a request only when the extension declared the capability
     /// and host policy permits the request.
     pub fn execute(&self, request: ExtensionRequest) -> Result<ExtensionResponse, RuntimeError> {
+        self.execute_with_context(request, &ExecutionContext::new(
+            lmlmxtend_api::CancellationToken::new(), None, self.max_output_bytes
+        ))
+    }
+
+    /// Dispatches with cooperative cancellation/deadline controls and a host-enforced output cap.
+    /// Legacy extensions remain callable but cannot be interrupted while inside execute().
+    pub fn execute_with_context(
+        &self,
+        request: ExtensionRequest,
+        context: &ExecutionContext,
+    ) -> Result<ExtensionResponse, RuntimeError> {
+        context.check_cancelled().map_err(|error| match error {
+            lmlmxtend_api::ExecutionControlError::Cancelled => RuntimeError::Cancelled,
+            lmlmxtend_api::ExecutionControlError::DeadlineExceeded => RuntimeError::DeadlineExceeded,
+            lmlmxtend_api::ExecutionControlError::OutputTooLarge => RuntimeError::OutputTooLarge,
+        })?;
         match self.policy.evaluate(&request.capability, &request.input) {
             PolicyDecision::Allow => {}
             PolicyDecision::DenyCapability | PolicyDecision::DenyInputTooLarge => {
@@ -109,7 +132,23 @@ impl Runtime {
             .ok_or_else(|| RuntimeError::CapabilityNotDeclared(request.capability.to_string()))?;
         let extension = self.extensions.get(owner)
             .ok_or_else(|| RuntimeError::ExtensionNotFound(owner.clone()))?;
-        extension.execute(request).map_err(RuntimeError::Extension)
+        let bounded_context = ExecutionContext::new(
+            context.cancellation_token(),
+            // Context exposes its own deadline through checks; output is always capped by host policy.
+            None,
+            context.max_output_bytes().min(self.max_output_bytes),
+        );
+        let response = extension.execute_with_context(request, &bounded_context)
+            .map_err(RuntimeError::Extension)?;
+        context.check_cancelled().map_err(|error| match error {
+            lmlmxtend_api::ExecutionControlError::Cancelled => RuntimeError::Cancelled,
+            lmlmxtend_api::ExecutionControlError::DeadlineExceeded => RuntimeError::DeadlineExceeded,
+            lmlmxtend_api::ExecutionControlError::OutputTooLarge => RuntimeError::OutputTooLarge,
+        })?;
+        if response.output.len() > self.max_output_bytes.min(context.max_output_bytes()) {
+            return Err(RuntimeError::OutputTooLarge);
+        }
+        Ok(response)
     }
 }
 

@@ -10,11 +10,16 @@ The initial runtime provides:
 - request cancellation tokens and monotonic deadlines, with cooperative extension support;
 - manifest API-version validation;
 - duplicate extension and capability rejection;
+- agent identity/version validation, per-agent capability grants, bounded task payloads, cancellation/deadline propagation, and delegation cycle/depth checks.
 - Rust unsafe-code prohibition at workspace level.
 
 ## Important limitation
 
 The current in-process extension trait is **not a security sandbox**. Registered extension code executes inside the host process with the host process's operating-system permissions. Do not load untrusted extensions into this runtime.
+
+## Agent-specific limitation
+
+Agent capability grants are enforced by the host API when an agent uses the provided context. They are not a sandbox: an in-process Rust agent can bypass the context and use any operating-system permissions available to the host. Nested delegation is synchronous and bounded, but it does not provide process isolation, parallel scheduling, or forced termination. Only register trusted agent implementations until an isolated worker boundary exists.
 
 ## Required before third-party extensions
 

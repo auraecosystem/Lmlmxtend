@@ -21,7 +21,8 @@
 - [ ] Property tests and fuzz targets.
 - [ ] CI for formatting, linting, and workspace tests.
 
-- [ ] Complete target workspace boundaries for intelligence, multimodal, agents, execution, and security.
+- [x] Initial intelligence crate with capability discovery, API-version checks, explicit provider preference, and runtime-mediated dispatch.
+- [ ] Complete target workspace boundaries for multimodal, agent runtime, execution, and security.
 
 ## Milestone 2 — LMLM processor bridge
 
@@ -32,6 +33,8 @@
 
 ## Milestone 3 — Intelligence and multimodal services
 
+- [x] Deterministic capability discovery and task planning (single-provider registry).
+- [ ] Multi-provider ranking and semantic task orchestration.
 - [ ] Task orchestration and agent lifecycle.
 - [ ] Typed image, audio, video, and spatial data contracts.
 - [ ] Streaming and cancellation semantics.

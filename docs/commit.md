@@ -192,4 +192,91 @@ Build verification outstanding
 
 The latest source files and commit history were fetched and verified on main. GitHub reported no workflow runs for the latest commit. This environment also lacks the Rust compiler and Cargo, so I cannot honestly report successful compilation or tests.
 
-Next development target: tracing and observability, followed by isolated extension execution and resource quotas.
+I’ll evolve the existing LMLMxtend workspace toward your proposed architecture without replacing working components or introducing unrelated dependencies.
+
+The standout addition will be an LMLMxtend Extension Forge: a native Rust command-line generator that scaffolds, validates and documents new extensions. It will give every extension a consistent manifest, capability contract, tests and integration path.
+
+Implemented and pushed
+
+New feature: LMLMxtend Extension Forge
+
+Native extension generator
+
+On main
+
+Generate a new extension package from the terminal without manually creating its boilerplate.
+
+cargo run -p lmlmxtend-extension-forge -- new \
+  --name scene-composer \
+  --category creative \
+  --capability creative.compose
+
+Binary: lmlmxtend-forge
+
+What it generates
+
+extensions/
+└── creative/
+    └── scene-composer/
+        ├── Cargo.toml
+        ├── extension.toml
+        ├── README.md
+        └── src/
+            └── lib.rs
+
+The generator includes:
+
+* Native Rust implementation of the existing extension API.
+* Extension identity and capability manifest.
+* Starter unit tests.
+* Input-validation guidance.
+* Local API dependency.
+* Safe naming and capability validation.
+* Protection against overwriting existing extensions.
+
+Supported extension domains
+
+Domain	Purpose
+creative	Creative intelligence and scene creation
+language	Language processing
+vision	Visual intelligence
+audio	Speech and sound
+spatial	3D, XR and spatial interaction
+agents	Agent capabilities
+
+Repository evolution
+
+The existing crates remain intact. I’ve documented how the architecture will grow toward your proposed structure:
+
+* crates/intelligence
+* crates/multimodal
+* crates/agent-runtime
+* crates/execution
+* crates/security
+* runtime/
+* extensions/
+* adapters/
+* sdk/
+* protocols/
+* tests/
+* benchmarks/
+
+These future boundaries are documented, not falsely presented as completed implementations.
+
+Latest commit
+
+f06b26d4c1dde27741bedff2ad187831cbcebf54
+
+View the latest commit⁠￼
+
+Verification status
+
+Compilation pending
+
+* Source files fetched and verified on main.
+* Workspace membership verified.
+* Generator validation tests authored.
+* Rust compilation and tests remain unverified because Cargo is unavailable in this environment.
+* No GitHub Actions run was reported yet.
+
+My recommendation for the next milestone: build the Extension Intelligence Layer — extensions should be able to declare capabilities, discover compatible extensions, negotiate tasks and cooperate through controlled execution. That is where LMLMxtend starts becoming an extended-intelligence platform rather than just a plugin framework.

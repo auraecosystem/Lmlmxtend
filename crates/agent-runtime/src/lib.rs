@@ -777,7 +777,9 @@ mod tests {
 
 mod orchestration;
 mod planning;
-pub use planning::{GoalExecutionError, GoalPlanner, GoalPlanningError, GoalRequest, GoalResult, MAX_GOAL_BYTES};
+pub use planning::{
+    GoalExecutionError, GoalPlanner, GoalPlanningError, GoalRequest, GoalResult, MAX_GOAL_BYTES,
+};
 pub use orchestration::{
     AgentPlan, PlanError, PlanNode, PlanResult, MAX_PARALLEL_TASKS, MAX_PLAN_NODES,
 };

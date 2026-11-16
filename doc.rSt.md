@@ -1,10 +1,10 @@
-That’s the better architecture. LMLM should have its own independent repository, while Olgin consumes it as an integrated intelligence processor.
+> That’s the better architecture. LMLM should have its own independent repository, while Olgin consumes it as an integrated intelligence processor.
 
-We should create a separate repository called LMLMxtend.
+> We should create a separate repository called LMLMxtend.
 
 Proposed repository architecture
 
-LMLM
+# LMLM
 
 Large Multi-Functional Linear Model
 

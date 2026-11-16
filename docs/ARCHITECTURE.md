@@ -15,7 +15,7 @@ LMLMxtend must remain useful to multiple host applications. Olgin integration be
 1. **API contracts** define manifests, capability identifiers, requests, responses, and extension errors.
 2. **Core** defines host configuration and policy primitives.
 3. **Runtime** validates extension manifests, registers capabilities, and dispatches requests.
-4. **Intelligence services** will coordinate tasks and route work to LMLM through a separately versioned processor bridge.
+4. **Intelligence services** discover compatible capability providers and plan deterministic task routes; future processor services will route model work to LMLM through a separately versioned bridge.
 5. **Multimodal services** will define typed media inputs/outputs and streaming contracts.
 6. **Adapters and SDKs** expose the framework to applications and language ecosystems.
 7. **Extension Forge** generates consistent extension packages from the public API contract.
@@ -47,6 +47,10 @@ The LMLM bridge is an adapter boundary. The core must not assume a specific LMLM
 7. Extension returns a typed response or a structured error.
 8. Host records telemetry and applies application-level cancellation/timeouts.
 
+## Capability intelligence
+
+The `lmlmxtend-intelligence` crate plans tasks against read-only runtime discovery, verifies the required extension API version, and honors explicit provider preferences. Plans execute through the runtime so policy and lifecycle checks remain authoritative. The current registry allows one owner per capability; multi-provider ranking and semantic delegation are future work. See [Intelligence Routing](INTELLIGENCE_ROUTING.md).
+
 ## Extension authoring
 
 The native `lmlmxtend-forge` CLI scaffolds standalone extension crates under `extensions/<category>/<name>`. It validates extension slugs and capability identifiers, writes a descriptor and starter tests, and refuses to overwrite an existing destination. Generated extensions are not loaded automatically; runtime registration, permissions, and isolation remain host responsibilities.
@@ -57,6 +61,7 @@ The repository is growing toward the following boundaries while preserving the e
 
 - `crates/lmlmxtend-api`: stable extension contracts (the logical extension-api layer).
 - `crates/lmlmxtend-core`: shared identity, policy, and configuration primitives.
+- `crates/intelligence`: capability discovery, API compatibility checks, and deterministic task planning.
 - `crates/extension-forge`: native extension generator.
 - `crates/intelligence`, `crates/multimodal`, `crates/agent-runtime`, `crates/execution`, and `crates/security`: future independently testable services; not yet implemented.
 - `runtime/`: future loader, lifecycle, scheduler, resource manager, and local-runtime modules.

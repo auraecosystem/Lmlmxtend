@@ -3,7 +3,7 @@
 //! Agents run in-process and are trusted code. This module provides explicit
 //! capability checks and bounded orchestration, not an operating-system sandbox.
 
-use lmlmxtend_api::{CapabilityId, ExecutionContext, ExtensionResponse, API_VERSION};
+use lmlmxtend_api::{CapabilityId, ExecutionContext, ExtensionResponse};
 use lmlmxtend_intelligence::{IntelligenceRouter, TaskIntent};
 use lmlmxtend_runtime::Runtime;
 use std::collections::{BTreeMap, BTreeSet};
@@ -385,7 +385,7 @@ mod tests {
             ExtensionManifest {
                 id: "extension.text".into(),
                 version: "1.0.0".into(),
-                api_version: API_VERSION,
+                api_version: lmlmxtend_api::API_VERSION,
                 capabilities: vec![CapabilityId::new("text.transform").unwrap()],
             }
         }

@@ -7,7 +7,7 @@
 use crate::{AgentError, AgentResponse, AgentRuntime, AgentTask};
 use lmlmxtend_api::ExecutionContext;
 use lmlmxtend_runtime::Runtime;
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 /// Maximum number of nodes accepted in one in-memory plan.

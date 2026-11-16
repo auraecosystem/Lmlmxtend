@@ -19,22 +19,14 @@ impl CapabilityId {
                 !part.is_empty()
                     && part.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
             });
-        if valid {
-            Ok(Self(value))
-        } else {
-            Err(ContractError::InvalidCapabilityId)
-        }
+        if valid { Ok(Self(value)) } else { Err(ContractError::InvalidCapabilityId) }
     }
 
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
+    pub fn as_str(&self) -> &str { &self.0 }
 }
 
 impl fmt::Display for CapabilityId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.write_str(&self.0) }
 }
 
 /// A request passed to an installed extension.
@@ -73,6 +65,13 @@ pub struct ExtensionManifest {
     pub capabilities: Vec<CapabilityId>,
 }
 
+/// Implement this contract to expose a capability to a LMLMxtend host.
+/// Implementations must document resource limits and treat caller input as untrusted.
+pub trait Extension: Send + Sync {
+    fn manifest(&self) -> ExtensionManifest;
+    fn execute(&self, request: ExtensionRequest) -> Result<ExtensionResponse, ExtensionError>;
+}
+
 /// Errors that can be returned by an extension.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ExtensionError {
@@ -81,19 +80,20 @@ pub enum ExtensionError {
     UnsupportedOperation,
 }
 
-/// Implement this contract to expose a capability to a LMLMxtend host.
-///
-/// Implementations must document resource limits and must not assume that
-/// caller-provided input is trusted.
-pub trait Extension: Send + Sync {
-    fn manifest(&self) -> ExtensionManifest;
-    fn execute(&self, request: ExtensionRequest) -> Result<ExtensionResponse, ExtensionError>;
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ContractError {
     InvalidCapabilityId,
 }
+
+impl fmt::Display for ContractError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidCapabilityId => f.write_str("invalid capability identifier"),
+        }
+    }
+}
+
+impl std::error::Error for ContractError {}
 
 #[cfg(test)]
 mod tests {

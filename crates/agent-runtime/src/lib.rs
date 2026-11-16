@@ -361,6 +361,40 @@ mod tests {
         }
     }
 
+    struct CorrelationAgent;
+
+    impl Agent for CorrelationAgent {
+        fn manifest(&self) -> AgentManifest {
+            AgentManifest {
+                id: "agent.correlation".into(),
+                version: "1.0.0".into(),
+                api_version: AGENT_API_VERSION,
+                capabilities: vec![],
+            }
+        }
+
+        fn execute(&self, task: AgentTask, _context: &AgentContext<'_>) -> Result<AgentResponse, AgentError> {
+            Ok(AgentResponse::text(task.correlation_id.unwrap_or_default()))
+        }
+    }
+
+    struct CorrelationParent;
+
+    impl Agent for CorrelationParent {
+        fn manifest(&self) -> AgentManifest {
+            AgentManifest {
+                id: "agent.correlation-parent".into(),
+                version: "1.0.0".into(),
+                api_version: AGENT_API_VERSION,
+                capabilities: vec![],
+            }
+        }
+
+        fn execute(&self, task: AgentTask, context: &AgentContext<'_>) -> Result<AgentResponse, AgentError> {
+            context.delegate("agent.correlation", AgentTask::new(task.task_id, task.input))
+        }
+    }
+
     struct LoopAgent;
 
     impl Agent for LoopAgent {
@@ -440,6 +474,16 @@ mod tests {
         agents.register(Arc::new(DelegatingAgent)).unwrap();
         let result = agents.execute(&empty_runtime(), "agent.parent", AgentTask::new("t2", "delegated"), &execution()).unwrap();
         assert_eq!(result.output, "delegated");
+    }
+
+    #[test]
+    fn propagates_correlation_id_through_delegation() {
+        let mut agents = AgentRuntime::default();
+        agents.register(Arc::new(CorrelationAgent)).unwrap();
+        agents.register(Arc::new(CorrelationParent)).unwrap();
+        let task = AgentTask::new("t-correlation", "payload").with_correlation_id("corr-42");
+        let result = agents.execute(&empty_runtime(), "agent.correlation-parent", task, &execution()).unwrap();
+        assert_eq!(result.output, "corr-42");
     }
 
     #[test]

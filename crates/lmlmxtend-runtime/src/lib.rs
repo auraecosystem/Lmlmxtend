@@ -135,8 +135,18 @@ impl Runtime {
         let extension = self.extensions.get(owner)
             .ok_or_else(|| RuntimeError::ExtensionNotFound(owner.clone()))?;
         let bounded_context = context.limited_to_output(self.max_output_bytes);
-        let response = extension.execute_with_context(request, &bounded_context)
-            .map_err(RuntimeError::Extension)?;
+        let response = match extension.execute_with_context(request, &bounded_context) {
+            Ok(response) => response,
+            Err(error) => {
+                // Prefer lifecycle errors when cooperative extension work observes them.
+                context.check_cancelled().map_err(|control| match control {
+                    lmlmxtend_api::ExecutionControlError::Cancelled => RuntimeError::Cancelled,
+                    lmlmxtend_api::ExecutionControlError::DeadlineExceeded => RuntimeError::DeadlineExceeded,
+                    lmlmxtend_api::ExecutionControlError::OutputTooLarge => RuntimeError::OutputTooLarge,
+                })?;
+                return Err(RuntimeError::Extension(error));
+            }
+        };
         context.check_cancelled().map_err(|error| match error {
             lmlmxtend_api::ExecutionControlError::Cancelled => RuntimeError::Cancelled,
             lmlmxtend_api::ExecutionControlError::DeadlineExceeded => RuntimeError::DeadlineExceeded,

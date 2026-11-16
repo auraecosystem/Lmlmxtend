@@ -19,7 +19,7 @@ The current in-process extension trait is **not a security sandbox**. Registered
 
 ## Agent-specific limitation
 
-Agent capability grants are enforced by the host API when an agent uses the provided context. They are not a sandbox: an in-process Rust agent can bypass the context and use any operating-system permissions available to the host. Nested delegation is synchronous and bounded, but it does not provide process isolation, parallel scheduling, or forced termination. Only register trusted agent implementations until an isolated worker boundary exists.
+Agent capability grants are enforced by the host API when an agent uses the provided context. They are not a sandbox: an in-process Rust agent can bypass the context and use any operating-system permissions available to the host. Nested delegation is synchronous and bounded. Plan execution supports bounded in-process parallelism (up to 32 workers), an execution-scoped shared key/value store, and bounded in-memory mailboxes. These coordination features do not provide process isolation, hard CPU/memory quotas, durable delivery, or forced termination. Only register trusted agent implementations until an isolated worker boundary exists.
 
 ## Required before third-party extensions
 
@@ -49,6 +49,10 @@ compatibility implementation delegates to the legacy synchronous `execute`
 method, so it cannot forcibly interrupt code that is already running.
 
 The host enforces the configured output-byte cap after execution. This does not
-prevent an extension from allocating excessive memory before returning. CPU time,
-resident memory, concurrency quotas, and forced termination require a future
-process/WASM isolation layer and are not provided by this in-process runtime.
+prevent an extension from allocating excessive memory before returning. The
+agent scheduler bounds the number of simultaneous agent invocations, but does
+not enforce CPU time, resident memory, or global host resource quotas. Forced
+termination requires a future process/WASM isolation layer and is not provided
+by this in-process runtime. Shared state and message queues are visible to
+registered agents in the same root execution; do not place secrets in them unless
+all participating agents are trusted to access that data.

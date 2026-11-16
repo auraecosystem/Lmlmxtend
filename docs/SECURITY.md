@@ -6,6 +6,8 @@ The initial runtime provides:
 - capability declaration and ownership checks;
 - optional capability allow-lists;
 - a configurable maximum request-input size;
+- a configurable maximum response-output size, checked by the host;
+- request cancellation tokens and monotonic deadlines, with cooperative extension support;
 - manifest API-version validation;
 - duplicate extension and capability rejection;
 - Rust unsafe-code prohibition at workspace level.
@@ -18,7 +20,7 @@ The current in-process extension trait is **not a security sandbox**. Registered
 
 1. Process or WASM sandbox with explicit filesystem, network, and device permissions.
 2. Per-extension memory, CPU, wall-clock, and output limits.
-3. Cancellation and shutdown semantics.
+3. Strong cancellation for isolated workers and bounded shutdown semantics.
 4. Signed package metadata and verified content hashes.
 5. Dependency and provenance policy.
 6. Secret isolation; extensions receive scoped handles, never ambient credentials.
@@ -32,3 +34,16 @@ The current in-process extension trait is **not a security sandbox**. Registered
 - Application integrations are optional.
 - Model/provider credentials are never embedded in extension manifests.
 - Treat all extension input and output as untrusted data.
+
+## Execution lifecycle limits
+
+The current runtime checks cancellation and deadlines before dispatch and after an
+extension returns. Extensions that override `execute_with_context` can poll the
+shared cancellation token and deadline between bounded units of work. The default
+compatibility implementation delegates to the legacy synchronous `execute`
+method, so it cannot forcibly interrupt code that is already running.
+
+The host enforces the configured output-byte cap after execution. This does not
+prevent an extension from allocating excessive memory before returning. CPU time,
+resident memory, concurrency quotas, and forced termination require a future
+process/WASM isolation layer and are not provided by this in-process runtime.

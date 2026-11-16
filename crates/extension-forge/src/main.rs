@@ -155,8 +155,11 @@ fn write_new(path: &Path, content: &str) -> Result<(), String> {
 
 fn validate_slug(value: &str) -> Result<(), String> {
     let valid = !value.is_empty() && value.len() <= 48
-        && value.as_bytes()[0].is_ascii_lowercase()
-        && value.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
+        && value.split('-').all(|part| {
+            !part.is_empty()
+                && part.as_bytes()[0].is_ascii_lowercase()
+                && part.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit())
+        });
     if valid { Ok(()) } else {
         Err("name must be 1-48 lowercase ASCII letters, digits, or hyphens; it must start with a letter".into())
     }
@@ -193,6 +196,8 @@ mod tests {
         assert!(validate_slug("../outside").is_err());
         assert!(validate_slug("UpperCase").is_err());
         assert!(validate_slug("valid-extension2").is_ok());
+        assert!(validate_slug("valid-2extension").is_err());
+        assert!(validate_slug("valid--extension").is_err());
     }
 
     #[test]

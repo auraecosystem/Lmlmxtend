@@ -4,6 +4,7 @@ members = [
     "crates/lmlmxtend-api",
     "crates/lmlmxtend-core",
     "crates/lmlmxtend-runtime",
+    "crates/extension-forge",
 ]
 
 [workspace.package]

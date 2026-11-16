@@ -9,6 +9,6 @@ description = "Capability discovery and deterministic task routing for LMLMxtend
 [dependencies]
 lmlmxtend-api = { path = "../lmlmxtend-api" }
 lmlmxtend-runtime = { path = "../lmlmxtend-runtime" }
-lmlmxtend-core = { path = "../lmlmxtend-core" }
 
-[workspace]
+[dev-dependencies]
+lmlmxtend-core = { path = "../lmlmxtend-core" }

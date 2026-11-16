@@ -338,18 +338,17 @@ impl AgentRuntime {
                 });
 
                 let mut first_error = None;
-                for (node_id, result) in batch_results {
+                for (node_id, result, panicked) in batch_results {
                     execution_order.push(node_id.clone());
+                    if panicked {
+                        if first_error.is_none() {
+                            first_error = Some(PlanError::AgentPanicked { node_id });
+                        }
+                        continue;
+                    }
                     match result {
                         Ok(response) => {
                             outputs.insert(node_id, response);
-                        }
-                        Err(AgentError::ExecutionFailed(message))
-                            if message == "agent thread panicked" =>
-                        {
-                            if first_error.is_none() {
-                                first_error = Some(PlanError::AgentPanicked { node_id });
-                            }
                         }
                         Err(source) => {
                             if first_error.is_none() {
@@ -485,6 +484,156 @@ mod tests {
                 node_id: "second".into(),
                 agent_id: "agent.missing".into(),
             })
+        );
+    }
+
+    #[test]
+    fn shares_state_and_delivers_messages_between_dependent_agents() {
+        struct Sender;
+        impl Agent for Sender {
+            fn manifest(&self) -> AgentManifest {
+                AgentManifest {
+                    id: "agent.sender".into(),
+                    version: "1.0.0".into(),
+                    api_version: AGENT_API_VERSION,
+                    capabilities: vec![],
+                }
+            }
+            fn execute(
+                &self,
+                _task: AgentTask,
+                context: &AgentContext<'_>,
+            ) -> Result<AgentResponse, AgentError> {
+                context.shared_state().set("result", "shared-value")?;
+                context.send_message("agent.receiver", "handoff-complete")?;
+                Ok(AgentResponse::text("sent"))
+            }
+        }
+
+        struct Receiver;
+        impl Agent for Receiver {
+            fn manifest(&self) -> AgentManifest {
+                AgentManifest {
+                    id: "agent.receiver".into(),
+                    version: "1.0.0".into(),
+                    api_version: AGENT_API_VERSION,
+                    capabilities: vec![],
+                }
+            }
+            fn execute(
+                &self,
+                _task: AgentTask,
+                context: &AgentContext<'_>,
+            ) -> Result<AgentResponse, AgentError> {
+                let messages = context.receive_messages()?;
+                let value = context.shared_state().get("result")?.unwrap_or_default();
+                Ok(AgentResponse::text(format!("{}:{value}", messages[0].payload)))
+            }
+        }
+
+        let mut agents = AgentRuntime::default();
+        agents.register(Arc::new(Sender)).unwrap();
+        agents.register(Arc::new(Receiver)).unwrap();
+        let mut plan = AgentPlan::new();
+        plan.add_node(PlanNode::new(
+            "send",
+            "agent.sender",
+            AgentTask::new("send-task", "start"),
+        ))
+        .unwrap();
+        plan.add_node(
+            PlanNode::new(
+                "receive",
+                "agent.receiver",
+                AgentTask::new("receive-task", "continue"),
+            )
+            .after("send"),
+        )
+        .unwrap();
+
+        let runtime = Runtime::new(RuntimeConfig::default());
+        let result = agents.execute_plan(&runtime, &plan, &context()).unwrap();
+        assert_eq!(
+            result.outputs["receive"].output,
+            "handoff-complete:shared-value"
+        );
+    }
+
+    #[test]
+    fn parallel_execution_respects_concurrency_limit() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::time::Duration;
+
+        struct TrackingAgent {
+            active: Arc<AtomicUsize>,
+            maximum: Arc<AtomicUsize>,
+        }
+        impl Agent for TrackingAgent {
+            fn manifest(&self) -> AgentManifest {
+                AgentManifest {
+                    id: "agent.tracker".into(),
+                    version: "1.0.0".into(),
+                    api_version: AGENT_API_VERSION,
+                    capabilities: vec![],
+                }
+            }
+            fn execute(
+                &self,
+                task: AgentTask,
+                _context: &AgentContext<'_>,
+            ) -> Result<AgentResponse, AgentError> {
+                let active = self.active.fetch_add(1, Ordering::SeqCst) + 1;
+                self.maximum.fetch_max(active, Ordering::SeqCst);
+                std::thread::sleep(Duration::from_millis(25));
+                self.active.fetch_sub(1, Ordering::SeqCst);
+                Ok(AgentResponse::text(task.input))
+            }
+        }
+
+        let active = Arc::new(AtomicUsize::new(0));
+        let maximum = Arc::new(AtomicUsize::new(0));
+        let mut agents = AgentRuntime::default();
+        agents
+            .register(Arc::new(TrackingAgent {
+                active,
+                maximum: maximum.clone(),
+            }))
+            .unwrap();
+
+        let mut plan = AgentPlan::new();
+        for index in 0..4 {
+            let id = format!("node-{index}");
+            plan.add_node(PlanNode::new(
+                id.clone(),
+                "agent.tracker",
+                AgentTask::new(id, "work"),
+            ))
+            .unwrap();
+        }
+
+        let runtime = Runtime::new(RuntimeConfig::default());
+        let result = agents
+            .execute_plan_parallel(&runtime, &plan, &context(), 2)
+            .unwrap();
+        assert_eq!(result.outputs.len(), 4);
+        assert!(maximum.load(Ordering::SeqCst) > 1);
+        assert!(maximum.load(Ordering::SeqCst) <= 2);
+    }
+
+    #[test]
+    fn rejects_zero_parallelism() {
+        let agents = AgentRuntime::default();
+        let mut plan = AgentPlan::new();
+        plan.add_node(PlanNode::new(
+            "one",
+            "agent.echo",
+            AgentTask::new("one", "input"),
+        ))
+        .unwrap();
+        let runtime = Runtime::new(RuntimeConfig::default());
+        assert_eq!(
+            agents.execute_plan_parallel(&runtime, &plan, &context(), 0),
+            Err(PlanError::InvalidConcurrency)
         );
     }
 

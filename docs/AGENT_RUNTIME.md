@@ -1,7 +1,7 @@
 # Multi-Agent Runtime
 
-The `lmlmxtend-agent-runtime` crate provides a local, synchronous agent registry
-and orchestration layer. It is separate from the LMLM neural processor and
+The `lmlmxtend-agent-runtime` crate provides a local agent registry, goal-planning boundary,
+and bounded orchestration layer. It is separate from the LMLM neural processor and
 executes registered Rust agent implementations through explicit host contracts.
 
 ## Agent contract
@@ -57,20 +57,21 @@ assert_eq!(result.execution_order, vec!["research", "draft"]);
 
 Before invoking any agent, the scheduler validates duplicate IDs, missing
 dependencies, repeated dependencies, self-dependencies, cycles, and the
-256-node limit. It then runs nodes sequentially in stable topological order
-(lexical node ID order among equally-ready nodes), collecting outputs by node
-ID. A task's input is never silently rewritten with predecessor output; agents
+256-node limit. It then runs nodes in stable dependency waves (lexical node ID order within each
+wave), collecting outputs by node ID. Independent nodes can run concurrently
+through `execute_plan_parallel`, with a host-selected limit from 1 to 32. A task's input is never silently rewritten with predecessor output; agents
 must receive any required data through explicit task construction by the host.
 
-Execution is fail-fast. A failed node stops the plan and is reported with its
-node ID and underlying `AgentError`. There is no implicit retry, rollback,
-parallel execution, or durable checkpointing.
+Execution is fail-fast. A failed node stops later batches/waves and is reported
+with its node ID and underlying `AgentError`. Peers already started in the same
+batch are joined before the error is returned. There is no implicit retry,
+rollback, or durable checkpointing.
 
 ## Current boundaries
 
 - Agents are synchronous, in-process Rust implementations.
-- Task-graph execution is deterministic and sequential; it is not a parallel
-  scheduler, distributed message bus, or durable workflow engine.
+- Task-graph scheduling is deterministic and bounded, but remains in-process;
+  it is not a distributed worker system or durable workflow engine.
 - Agent manifests express capability grants but do not sandbox trusted Rust code.
   An agent can still use any ambient operating-system authority available to the
   host process. Do not register untrusted agent code.

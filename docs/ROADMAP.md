@@ -8,6 +8,7 @@
 - [x] In-process registry and dispatcher.
 - [x] Basic policy checks and unit tests.
 - [x] Architecture and security documentation.
+- [x] Native Extension Forge CLI with safe scaffolding and starter tests.
 
 ## Milestone 1 — Runtime hardening
 
@@ -19,6 +20,8 @@
 - [x] Read-only extension health reporting.
 - [ ] Property tests and fuzz targets.
 - [ ] CI for formatting, linting, and workspace tests.
+
+- [ ] Complete target workspace boundaries for intelligence, multimodal, agents, execution, and security.
 
 ## Milestone 2 — LMLM processor bridge
 

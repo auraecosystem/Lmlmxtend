@@ -7,12 +7,13 @@ use std::collections::BTreeSet;
 #[derive(Clone, Debug)]
 pub struct RuntimeConfig {
     pub max_input_bytes: usize,
+    pub max_output_bytes: usize,
     pub allowed_capabilities: Option<BTreeSet<CapabilityId>>,
 }
 
 impl Default for RuntimeConfig {
     fn default() -> Self {
-        Self { max_input_bytes: 1_048_576, allowed_capabilities: None }
+        Self { max_input_bytes: 1_048_576, max_output_bytes: 1_048_576, allowed_capabilities: None }
     }
 }
 

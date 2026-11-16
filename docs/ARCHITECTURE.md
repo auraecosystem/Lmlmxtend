@@ -16,7 +16,7 @@ LMLMxtend must remain useful to multiple host applications. Olgin integration be
 2. **Core** defines host configuration and policy primitives.
 3. **Runtime** validates extension manifests, registers capabilities, and dispatches requests.
 4. **Intelligence services** discover compatible capability providers and plan deterministic task routes.
-5. **Agent runtime** manages agent identities, capability grants, lifecycle controls, and bounded nested delegation.
+5. **Agent runtime** manages agent identities, capability grants, lifecycle controls, bounded nested delegation, shared per-execution state, bounded mailboxes, and dependency-aware parallel task graphs.
 6. **Multimodal services** will define typed media inputs/outputs and streaming contracts.
 7. **Adapters and SDKs** expose the framework to applications and language ecosystems.
 8. **Extension Forge** generates consistent extension packages from the public API contract.

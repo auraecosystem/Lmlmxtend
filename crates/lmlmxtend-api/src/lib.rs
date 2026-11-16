@@ -108,6 +108,11 @@ impl ExecutionContext {
         self.deadline.is_some_and(|deadline| std::time::Instant::now() >= deadline)
     }
     pub fn max_output_bytes(&self) -> usize { self.max_output_bytes }
+    pub fn limited_to_output(&self, max_output_bytes: usize) -> Self {
+        let mut context = self.clone();
+        context.max_output_bytes = context.max_output_bytes.min(max_output_bytes);
+        context
+    }
     /// Extensions should call this between bounded units of work.
     pub fn check_cancelled(&self) -> Result<(), ExecutionControlError> {
         if self.is_cancelled() { return Err(ExecutionControlError::Cancelled); }

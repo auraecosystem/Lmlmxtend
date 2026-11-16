@@ -22,7 +22,8 @@
 - [ ] CI for formatting, linting, and workspace tests.
 
 - [x] Initial intelligence crate with capability discovery, API-version checks, explicit provider preference, and runtime-mediated dispatch.
-- [ ] Complete target workspace boundaries for multimodal, agent runtime, execution, and security.
+- [x] Initial agent-runtime workspace boundary with permission-aware registration and bounded delegation.
+- [ ] Complete target workspace boundaries for multimodal, execution, and security.
 
 ## Milestone 2 — LMLM processor bridge
 
@@ -35,7 +36,8 @@
 
 - [x] Deterministic capability discovery and task planning (single-provider registry).
 - [ ] Multi-provider ranking and semantic task orchestration.
-- [ ] Task orchestration and agent lifecycle.
+- [x] Initial synchronous agent lifecycle and nested task delegation with cycle/depth limits.
+- [ ] Parallel scheduling, durable task state, and inter-agent messaging.
 - [ ] Typed image, audio, video, and spatial data contracts.
 - [ ] Streaming and cancellation semantics.
 - [ ] Memory interface with explicit ownership and retention controls.

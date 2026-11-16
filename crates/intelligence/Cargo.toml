@@ -1,0 +1,13 @@
+[package]
+name = "lmlmxtend-intelligence"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Capability discovery and deterministic task routing for LMLMxtend"
+
+[dependencies]
+lmlmxtend-api = { path = "../lmlmxtend-api" }
+lmlmxtend-runtime = { path = "../lmlmxtend-runtime" }
+
+[workspace]

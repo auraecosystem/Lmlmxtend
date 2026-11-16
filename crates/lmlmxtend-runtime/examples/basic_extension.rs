@@ -1,4 +1,6 @@
-use lmlmxtend_api::{CapabilityId, Extension, ExtensionError, ExtensionManifest, ExtensionRequest, ExtensionResponse};
+use lmlmxtend_api::{
+    CapabilityId, Extension, ExtensionError, ExtensionManifest, ExtensionRequest, ExtensionResponse,
+};
 use lmlmxtend_core::RuntimeConfig;
 use lmlmxtend_runtime::Runtime;
 use std::sync::Arc;
@@ -16,7 +18,10 @@ impl Extension for Greeting {
     }
 
     fn execute(&self, request: ExtensionRequest) -> Result<ExtensionResponse, ExtensionError> {
-        Ok(ExtensionResponse::text(format!("Hello, {}!", request.input)))
+        Ok(ExtensionResponse::text(format!(
+            "Hello, {}!",
+            request.input
+        )))
     }
 }
 

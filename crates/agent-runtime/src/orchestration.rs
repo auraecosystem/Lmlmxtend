@@ -24,12 +24,13 @@ pub struct PlanNode {
 }
 
 impl PlanNode {
-    pub fn new(
-        id: impl Into<String>,
-        agent_id: impl Into<String>,
-        task: AgentTask,
-    ) -> Self {
-        Self { id: id.into(), agent_id: agent_id.into(), task, depends_on: Vec::new() }
+    pub fn new(id: impl Into<String>, agent_id: impl Into<String>, task: AgentTask) -> Self {
+        Self {
+            id: id.into(),
+            agent_id: agent_id.into(),
+            task,
+            depends_on: Vec::new(),
+        }
     }
 
     pub fn after(mut self, dependency: impl Into<String>) -> Self {
@@ -45,14 +46,18 @@ pub struct AgentPlan {
 }
 
 impl AgentPlan {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn add_node(&mut self, node: PlanNode) -> Result<(), PlanError> {
         if self.nodes.len() >= MAX_PLAN_NODES {
             return Err(PlanError::TooManyNodes);
         }
         if node.id.trim().is_empty() || node.agent_id.trim().is_empty() {
-            return Err(PlanError::InvalidNode("node and agent IDs are required".into()));
+            return Err(PlanError::InvalidNode(
+                "node and agent IDs are required".into(),
+            ));
         }
         if self.nodes.iter().any(|existing| existing.id == node.id) {
             return Err(PlanError::DuplicateNode(node.id));
@@ -61,7 +66,9 @@ impl AgentPlan {
         Ok(())
     }
 
-    pub fn nodes(&self) -> &[PlanNode] { &self.nodes }
+    pub fn nodes(&self) -> &[PlanNode] {
+        &self.nodes
+    }
 
     /// Validate references and cycles, returning a stable topological order.
     /// Among simultaneously ready nodes, lexical node ID order is used.
@@ -76,15 +83,16 @@ impl AgentPlan {
         let mut by_id = BTreeMap::new();
         for node in &self.nodes {
             if node.id.trim().is_empty() || node.agent_id.trim().is_empty() {
-                return Err(PlanError::InvalidNode("node and agent IDs are required".into()));
+                return Err(PlanError::InvalidNode(
+                    "node and agent IDs are required".into(),
+                ));
             }
             if by_id.insert(node.id.as_str(), node).is_some() {
                 return Err(PlanError::DuplicateNode(node.id.clone()));
             }
         }
 
-        let mut indegree: BTreeMap<&str, usize> =
-            by_id.keys().map(|id| (*id, 0)).collect();
+        let mut indegree: BTreeMap<&str, usize> = by_id.keys().map(|id| (*id, 0)).collect();
         let mut outgoing: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
 
         for node in &self.nodes {
@@ -105,12 +113,18 @@ impl AgentPlan {
                         dependency: dependency.clone(),
                     });
                 }
-                *indegree.get_mut(node.id.as_str()).expect("node was indexed") += 1;
-                outgoing.entry(dependency.as_str()).or_default().push(node.id.as_str());
+                *indegree
+                    .get_mut(node.id.as_str())
+                    .expect("node was indexed") += 1;
+                outgoing
+                    .entry(dependency.as_str())
+                    .or_default()
+                    .push(node.id.as_str());
             }
         }
 
-        let mut ready: BTreeSet<&str> = indegree.iter()
+        let mut ready: BTreeSet<&str> = indegree
+            .iter()
             .filter_map(|(id, degree)| (*degree == 0).then_some(*id))
             .collect();
         let mut order = Vec::with_capacity(self.nodes.len());
@@ -166,15 +180,25 @@ impl fmt::Display for PlanError {
             Self::InvalidNode(reason) => write!(f, "invalid plan node: {reason}"),
             Self::DuplicateNode(id) => write!(f, "duplicate plan node: {id}"),
             Self::SelfDependency(id) => write!(f, "plan node '{id}' depends on itself"),
-            Self::DuplicateDependency { node_id, dependency } =>
-                write!(f, "plan node '{node_id}' repeats dependency '{dependency}'"),
-            Self::MissingDependency { node_id, dependency } =>
-                write!(f, "plan node '{node_id}' references missing dependency '{dependency}'"),
+            Self::DuplicateDependency {
+                node_id,
+                dependency,
+            } => write!(f, "plan node '{node_id}' repeats dependency '{dependency}'"),
+            Self::MissingDependency {
+                node_id,
+                dependency,
+            } => write!(
+                f,
+                "plan node '{node_id}' references missing dependency '{dependency}'"
+            ),
             Self::CycleDetected => f.write_str("agent plan contains a dependency cycle"),
-            Self::AgentNotRegistered { node_id, agent_id } =>
-                write!(f, "plan node '{node_id}' references unregistered agent '{agent_id}'"),
-            Self::AgentFailed { node_id, source } =>
-                write!(f, "agent task '{node_id}' failed: {source}"),
+            Self::AgentNotRegistered { node_id, agent_id } => write!(
+                f,
+                "plan node '{node_id}' references unregistered agent '{agent_id}'"
+            ),
+            Self::AgentFailed { node_id, source } => {
+                write!(f, "agent task '{node_id}' failed: {source}")
+            }
         }
     }
 }
@@ -192,8 +216,11 @@ impl AgentRuntime {
         execution: &ExecutionContext,
     ) -> Result<PlanResult, PlanError> {
         let order = plan.execution_order()?;
-        let nodes: BTreeMap<&str, &PlanNode> =
-            plan.nodes().iter().map(|node| (node.id.as_str(), node)).collect();
+        let nodes: BTreeMap<&str, &PlanNode> = plan
+            .nodes()
+            .iter()
+            .map(|node| (node.id.as_str(), node))
+            .collect();
         // Preflight every agent reference before running any user code.
         for node_id in &order {
             let node = nodes.get(node_id.as_str()).expect("validated node exists");
@@ -209,19 +236,19 @@ impl AgentRuntime {
 
         for node_id in &order {
             let node = nodes.get(node_id.as_str()).expect("validated node exists");
-            let response = self.execute(
-                runtime,
-                &node.agent_id,
-                node.task.clone(),
-                execution,
-            ).map_err(|source| PlanError::AgentFailed {
-                node_id: node.id.clone(),
-                source,
-            })?;
+            let response = self
+                .execute(runtime, &node.agent_id, node.task.clone(), execution)
+                .map_err(|source| PlanError::AgentFailed {
+                    node_id: node.id.clone(),
+                    source,
+                })?;
             outputs.insert(node.id.clone(), response);
         }
 
-        Ok(PlanResult { execution_order: order, outputs })
+        Ok(PlanResult {
+            execution_order: order,
+            outputs,
+        })
     }
 }
 
@@ -261,16 +288,22 @@ mod tests {
     #[test]
     fn produces_stable_topological_order() {
         let mut plan = AgentPlan::new();
-        plan.add_node(PlanNode::new("c", "agent.echo", AgentTask::new("c", "C")).after("a")).unwrap();
-        plan.add_node(PlanNode::new("b", "agent.echo", AgentTask::new("b", "B"))).unwrap();
-        plan.add_node(PlanNode::new("a", "agent.echo", AgentTask::new("a", "A"))).unwrap();
+        plan.add_node(PlanNode::new("c", "agent.echo", AgentTask::new("c", "C")).after("a"))
+            .unwrap();
+        plan.add_node(PlanNode::new("b", "agent.echo", AgentTask::new("b", "B")))
+            .unwrap();
+        plan.add_node(PlanNode::new("a", "agent.echo", AgentTask::new("a", "A")))
+            .unwrap();
         assert_eq!(plan.execution_order().unwrap(), vec!["a", "b", "c"]);
     }
 
     #[test]
     fn rejects_missing_dependency_before_execution() {
         let mut plan = AgentPlan::new();
-        plan.add_node(PlanNode::new("child", "agent.echo", AgentTask::new("t", "x")).after("missing")).unwrap();
+        plan.add_node(
+            PlanNode::new("child", "agent.echo", AgentTask::new("t", "x")).after("missing"),
+        )
+        .unwrap();
         assert!(matches!(
             plan.execution_order(),
             Err(PlanError::MissingDependency { .. })
@@ -280,8 +313,10 @@ mod tests {
     #[test]
     fn rejects_dependency_cycles() {
         let mut plan = AgentPlan::new();
-        plan.add_node(PlanNode::new("a", "agent.echo", AgentTask::new("a", "A")).after("b")).unwrap();
-        plan.add_node(PlanNode::new("b", "agent.echo", AgentTask::new("b", "B")).after("a")).unwrap();
+        plan.add_node(PlanNode::new("a", "agent.echo", AgentTask::new("a", "A")).after("b"))
+            .unwrap();
+        plan.add_node(PlanNode::new("b", "agent.echo", AgentTask::new("b", "B")).after("a"))
+            .unwrap();
         assert_eq!(plan.execution_order(), Err(PlanError::CycleDetected));
     }
 
@@ -290,8 +325,16 @@ mod tests {
         let mut agents = AgentRuntime::default();
         agents.register(Arc::new(EchoAgent)).unwrap();
         let mut plan = AgentPlan::new();
-        plan.add_node(PlanNode::new("second", "agent.echo", AgentTask::new("t2", "two")).after("first")).unwrap();
-        plan.add_node(PlanNode::new("first", "agent.echo", AgentTask::new("t1", "one"))).unwrap();
+        plan.add_node(
+            PlanNode::new("second", "agent.echo", AgentTask::new("t2", "two")).after("first"),
+        )
+        .unwrap();
+        plan.add_node(PlanNode::new(
+            "first",
+            "agent.echo",
+            AgentTask::new("t1", "one"),
+        ))
+        .unwrap();
 
         let runtime = Runtime::new(RuntimeConfig::default());
         let result = agents.execute_plan(&runtime, &plan, &context()).unwrap();
@@ -305,8 +348,16 @@ mod tests {
         let mut agents = AgentRuntime::default();
         agents.register(Arc::new(EchoAgent)).unwrap();
         let mut plan = AgentPlan::new();
-        plan.add_node(PlanNode::new("first", "agent.echo", AgentTask::new("t1", "one"))).unwrap();
-        plan.add_node(PlanNode::new("second", "agent.missing", AgentTask::new("t2", "two")).after("first")).unwrap();
+        plan.add_node(PlanNode::new(
+            "first",
+            "agent.echo",
+            AgentTask::new("t1", "one"),
+        ))
+        .unwrap();
+        plan.add_node(
+            PlanNode::new("second", "agent.missing", AgentTask::new("t2", "two")).after("first"),
+        )
+        .unwrap();
 
         let runtime = Runtime::new(RuntimeConfig::default());
         assert_eq!(
@@ -320,6 +371,9 @@ mod tests {
 
     #[test]
     fn rejects_empty_plan() {
-        assert_eq!(AgentPlan::new().execution_order(), Err(PlanError::EmptyPlan));
+        assert_eq!(
+            AgentPlan::new().execution_order(),
+            Err(PlanError::EmptyPlan)
+        );
     }
 }

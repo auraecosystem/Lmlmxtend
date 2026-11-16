@@ -13,7 +13,11 @@ pub struct RuntimeConfig {
 
 impl Default for RuntimeConfig {
     fn default() -> Self {
-        Self { max_input_bytes: 1_048_576, max_output_bytes: 1_048_576, allowed_capabilities: None }
+        Self {
+            max_input_bytes: 1_048_576,
+            max_output_bytes: 1_048_576,
+            allowed_capabilities: None,
+        }
     }
 }
 
@@ -43,7 +47,11 @@ impl ExecutionPolicy {
         if input.len() > self.max_input_bytes {
             return PolicyDecision::DenyInputTooLarge;
         }
-        if self.allowed_capabilities.as_ref().is_some_and(|allowed| !allowed.contains(capability)) {
+        if self
+            .allowed_capabilities
+            .as_ref()
+            .is_some_and(|allowed| !allowed.contains(capability))
+        {
             return PolicyDecision::DenyCapability;
         }
         PolicyDecision::Allow

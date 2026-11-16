@@ -32,7 +32,11 @@ pub struct AgentTask {
 
 impl AgentTask {
     pub fn new(task_id: impl Into<String>, input: impl Into<String>) -> Self {
-        Self { task_id: task_id.into(), input: input.into(), correlation_id: None }
+        Self {
+            task_id: task_id.into(),
+            input: input.into(),
+            correlation_id: None,
+        }
     }
 
     pub fn with_correlation_id(mut self, id: impl Into<String>) -> Self {
@@ -50,7 +54,10 @@ pub struct AgentResponse {
 
 impl AgentResponse {
     pub fn text(output: impl Into<String>) -> Self {
-        Self { output: output.into(), media_type: "text/plain; charset=utf-8".into() }
+        Self {
+            output: output.into(),
+            media_type: "text/plain; charset=utf-8".into(),
+        }
     }
 }
 
@@ -98,8 +105,12 @@ impl fmt::Display for AgentError {
             Self::AgentNotFound(id) => write!(f, "agent not found: {id}"),
             Self::InputTooLarge => f.write_str("agent task input exceeds configured limit"),
             Self::OutputTooLarge => f.write_str("agent output exceeds configured limit"),
-            Self::CapabilityDenied(capability) => write!(f, "agent is not permitted to use capability '{capability}'"),
-            Self::CapabilityExecutionFailed(reason) => write!(f, "capability execution failed: {reason}"),
+            Self::CapabilityDenied(capability) => {
+                write!(f, "agent is not permitted to use capability '{capability}'")
+            }
+            Self::CapabilityExecutionFailed(reason) => {
+                write!(f, "capability execution failed: {reason}")
+            }
             Self::DelegationCycle(id) => write!(f, "agent delegation cycle detected at '{id}'"),
             Self::DelegationDepthExceeded => f.write_str("maximum agent delegation depth exceeded"),
             Self::Cancelled => f.write_str("agent execution cancelled"),
@@ -114,7 +125,11 @@ impl std::error::Error for AgentError {}
 /// Implement this contract to register an agent with the local host.
 pub trait Agent: Send + Sync {
     fn manifest(&self) -> AgentManifest;
-    fn execute(&self, task: AgentTask, context: &AgentContext<'_>) -> Result<AgentResponse, AgentError>;
+    fn execute(
+        &self,
+        task: AgentTask,
+        context: &AgentContext<'_>,
+    ) -> Result<AgentResponse, AgentError>;
 }
 
 #[derive(Clone)]
@@ -145,9 +160,13 @@ pub struct AgentContext<'a> {
 }
 
 impl<'a> AgentContext<'a> {
-    pub fn agent_id(&self) -> &str { &self.agent_id }
+    pub fn agent_id(&self) -> &str {
+        &self.agent_id
+    }
 
-    pub fn execution_context(&self) -> &ExecutionContext { self.execution }
+    pub fn execution_context(&self) -> &ExecutionContext {
+        self.execution
+    }
 
     /// Execute an extension capability only if this agent declared it in its manifest.
     pub fn execute_capability(
@@ -158,12 +177,15 @@ impl<'a> AgentContext<'a> {
         if !self.allowed_capabilities.contains(&capability) {
             return Err(AgentError::CapabilityDenied(capability.to_string()));
         }
-        self.execution.check_cancelled().map_err(map_lifecycle_error)?;
+        self.execution
+            .check_cancelled()
+            .map_err(map_lifecycle_error)?;
         let mut intent = TaskIntent::new(capability, input);
         if let Some(id) = &self.correlation_id {
             intent = intent.with_correlation_id(id.clone());
         }
-        IntelligenceRouter.execute_with_context(self.runtime, intent, self.execution)
+        IntelligenceRouter
+            .execute_with_context(self.runtime, intent, self.execution)
             .map_err(|error| AgentError::CapabilityExecutionFailed(error.to_string()))
     }
 
@@ -199,12 +221,17 @@ pub struct AgentRuntime {
 }
 
 impl Default for AgentRuntime {
-    fn default() -> Self { Self::new(AgentRuntimeConfig::default()) }
+    fn default() -> Self {
+        Self::new(AgentRuntimeConfig::default())
+    }
 }
 
 impl AgentRuntime {
     pub fn new(config: AgentRuntimeConfig) -> Self {
-        Self { config, agents: BTreeMap::new() }
+        Self {
+            config,
+            agents: BTreeMap::new(),
+        }
     }
 
     /// Validate and register an agent. The manifest is snapshotted at registration.
@@ -212,11 +239,13 @@ impl AgentRuntime {
         let manifest = agent.manifest();
         if !valid_agent_id(&manifest.id) || manifest.version.trim().is_empty() {
             return Err(AgentError::InvalidManifest(
-                "id must be a lowercase namespaced identifier and version is required".into()
+                "id must be a lowercase namespaced identifier and version is required".into(),
             ));
         }
         if manifest.api_version != AGENT_API_VERSION {
-            return Err(AgentError::InvalidManifest("incompatible agent API version".into()));
+            return Err(AgentError::InvalidManifest(
+                "incompatible agent API version".into(),
+            ));
         }
         if self.agents.contains_key(&manifest.id) {
             return Err(AgentError::DuplicateAgent(manifest.id));
@@ -229,19 +258,25 @@ impl AgentRuntime {
                 )));
             }
         }
-        self.agents.insert(manifest.id.clone(), AgentEntry { manifest, agent });
+        self.agents
+            .insert(manifest.id.clone(), AgentEntry { manifest, agent });
         Ok(())
     }
 
-    pub fn agent_count(&self) -> usize { self.agents.len() }
+    pub fn agent_count(&self) -> usize {
+        self.agents.len()
+    }
 
     pub fn agents(&self) -> Vec<AgentDescriptor> {
-        self.agents.values().map(|entry| AgentDescriptor {
-            id: entry.manifest.id.clone(),
-            version: entry.manifest.version.clone(),
-            api_version: entry.manifest.api_version,
-            capabilities: entry.manifest.capabilities.clone(),
-        }).collect()
+        self.agents
+            .values()
+            .map(|entry| AgentDescriptor {
+                id: entry.manifest.id.clone(),
+                version: entry.manifest.version.clone(),
+                api_version: entry.manifest.api_version,
+                capabilities: entry.manifest.capabilities.clone(),
+            })
+            .collect()
     }
 
     pub fn execute(
@@ -272,7 +307,9 @@ impl AgentRuntime {
         if delegation_stack.len() > self.config.max_delegation_depth {
             return Err(AgentError::DelegationDepthExceeded);
         }
-        let entry = self.agents.get(agent_id)
+        let entry = self
+            .agents
+            .get(agent_id)
             .ok_or_else(|| AgentError::AgentNotFound(agent_id.to_owned()))?;
         let agent = Arc::clone(&entry.agent);
         let allowed: BTreeSet<CapabilityId> = entry.manifest.capabilities.iter().cloned().collect();
@@ -306,9 +343,9 @@ fn valid_agent_id(id: &str) -> bool {
         && id.len() <= 128
         && id.split('.').all(|part| {
             !part.is_empty()
-                && part.chars().all(|c| {
-                    c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_'
-                })
+                && part
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
         })
 }
 
@@ -323,11 +360,15 @@ fn map_lifecycle_error(error: lmlmxtend_api::ExecutionControlError) -> AgentErro
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lmlmxtend_api::{CancellationToken, Extension, ExtensionError, ExtensionManifest, ExtensionRequest};
+    use lmlmxtend_api::{
+        CancellationToken, Extension, ExtensionError, ExtensionManifest, ExtensionRequest,
+    };
     use lmlmxtend_core::RuntimeConfig;
     use std::sync::Arc;
 
-    struct EchoAgent { id: &'static str }
+    struct EchoAgent {
+        id: &'static str,
+    }
 
     impl Agent for EchoAgent {
         fn manifest(&self) -> AgentManifest {
@@ -339,7 +380,11 @@ mod tests {
             }
         }
 
-        fn execute(&self, task: AgentTask, _context: &AgentContext<'_>) -> Result<AgentResponse, AgentError> {
+        fn execute(
+            &self,
+            task: AgentTask,
+            _context: &AgentContext<'_>,
+        ) -> Result<AgentResponse, AgentError> {
             Ok(AgentResponse::text(task.input))
         }
     }
@@ -356,7 +401,11 @@ mod tests {
             }
         }
 
-        fn execute(&self, task: AgentTask, context: &AgentContext<'_>) -> Result<AgentResponse, AgentError> {
+        fn execute(
+            &self,
+            task: AgentTask,
+            context: &AgentContext<'_>,
+        ) -> Result<AgentResponse, AgentError> {
             context.delegate("agent.echo", AgentTask::new(task.task_id, task.input))
         }
     }
@@ -373,7 +422,11 @@ mod tests {
             }
         }
 
-        fn execute(&self, task: AgentTask, _context: &AgentContext<'_>) -> Result<AgentResponse, AgentError> {
+        fn execute(
+            &self,
+            task: AgentTask,
+            _context: &AgentContext<'_>,
+        ) -> Result<AgentResponse, AgentError> {
             Ok(AgentResponse::text(task.correlation_id.unwrap_or_default()))
         }
     }
@@ -390,8 +443,15 @@ mod tests {
             }
         }
 
-        fn execute(&self, task: AgentTask, context: &AgentContext<'_>) -> Result<AgentResponse, AgentError> {
-            context.delegate("agent.correlation", AgentTask::new(task.task_id, task.input))
+        fn execute(
+            &self,
+            task: AgentTask,
+            context: &AgentContext<'_>,
+        ) -> Result<AgentResponse, AgentError> {
+            context.delegate(
+                "agent.correlation",
+                AgentTask::new(task.task_id, task.input),
+            )
         }
     }
 
@@ -407,7 +467,11 @@ mod tests {
             }
         }
 
-        fn execute(&self, task: AgentTask, context: &AgentContext<'_>) -> Result<AgentResponse, AgentError> {
+        fn execute(
+            &self,
+            task: AgentTask,
+            context: &AgentContext<'_>,
+        ) -> Result<AgentResponse, AgentError> {
             context.delegate("agent.loop", task)
         }
     }
@@ -441,11 +505,13 @@ mod tests {
             }
         }
 
-        fn execute(&self, task: AgentTask, context: &AgentContext<'_>) -> Result<AgentResponse, AgentError> {
-            let result = context.execute_capability(
-                CapabilityId::new("text.transform").unwrap(),
-                task.input,
-            )?;
+        fn execute(
+            &self,
+            task: AgentTask,
+            context: &AgentContext<'_>,
+        ) -> Result<AgentResponse, AgentError> {
+            let result = context
+                .execute_capability(CapabilityId::new("text.transform").unwrap(), task.input)?;
             Ok(AgentResponse::text(result.output))
         }
     }
@@ -461,8 +527,17 @@ mod tests {
     #[test]
     fn registers_and_runs_agent() {
         let mut agents = AgentRuntime::default();
-        agents.register(Arc::new(EchoAgent { id: "agent.echo" })).unwrap();
-        let result = agents.execute(&empty_runtime(), "agent.echo", AgentTask::new("t1", "hello"), &execution()).unwrap();
+        agents
+            .register(Arc::new(EchoAgent { id: "agent.echo" }))
+            .unwrap();
+        let result = agents
+            .execute(
+                &empty_runtime(),
+                "agent.echo",
+                AgentTask::new("t1", "hello"),
+                &execution(),
+            )
+            .unwrap();
         assert_eq!(result.output, "hello");
         assert_eq!(agents.agent_count(), 1);
     }
@@ -470,9 +545,18 @@ mod tests {
     #[test]
     fn delegates_to_registered_agent() {
         let mut agents = AgentRuntime::default();
-        agents.register(Arc::new(EchoAgent { id: "agent.echo" })).unwrap();
+        agents
+            .register(Arc::new(EchoAgent { id: "agent.echo" }))
+            .unwrap();
         agents.register(Arc::new(DelegatingAgent)).unwrap();
-        let result = agents.execute(&empty_runtime(), "agent.parent", AgentTask::new("t2", "delegated"), &execution()).unwrap();
+        let result = agents
+            .execute(
+                &empty_runtime(),
+                "agent.parent",
+                AgentTask::new("t2", "delegated"),
+                &execution(),
+            )
+            .unwrap();
         assert_eq!(result.output, "delegated");
     }
 
@@ -482,7 +566,14 @@ mod tests {
         agents.register(Arc::new(CorrelationAgent)).unwrap();
         agents.register(Arc::new(CorrelationParent)).unwrap();
         let task = AgentTask::new("t-correlation", "payload").with_correlation_id("corr-42");
-        let result = agents.execute(&empty_runtime(), "agent.correlation-parent", task, &execution()).unwrap();
+        let result = agents
+            .execute(
+                &empty_runtime(),
+                "agent.correlation-parent",
+                task,
+                &execution(),
+            )
+            .unwrap();
         assert_eq!(result.output, "corr-42");
     }
 
@@ -490,7 +581,9 @@ mod tests {
     fn rejects_invalid_agent_identity() {
         let mut agents = AgentRuntime::default();
         assert_eq!(
-            agents.register(Arc::new(EchoAgent { id: "Invalid Agent" })),
+            agents.register(Arc::new(EchoAgent {
+                id: "Invalid Agent"
+            })),
             Err(AgentError::InvalidManifest(
                 "id must be a lowercase namespaced identifier and version is required".into()
             ))
@@ -502,7 +595,12 @@ mod tests {
         let mut agents = AgentRuntime::default();
         agents.register(Arc::new(LoopAgent)).unwrap();
         assert_eq!(
-            agents.execute(&empty_runtime(), "agent.loop", AgentTask::new("t3", "loop"), &execution()),
+            agents.execute(
+                &empty_runtime(),
+                "agent.loop",
+                AgentTask::new("t3", "loop"),
+                &execution()
+            ),
             Err(AgentError::DelegationCycle("agent.loop".into()))
         );
     }
@@ -514,10 +612,17 @@ mod tests {
             max_task_output_bytes: 1024,
             max_delegation_depth: 0,
         });
-        agents.register(Arc::new(EchoAgent { id: "agent.echo" })).unwrap();
+        agents
+            .register(Arc::new(EchoAgent { id: "agent.echo" }))
+            .unwrap();
         agents.register(Arc::new(DelegatingAgent)).unwrap();
         assert_eq!(
-            agents.execute(&empty_runtime(), "agent.parent", AgentTask::new("t-depth", "hello"), &execution()),
+            agents.execute(
+                &empty_runtime(),
+                "agent.parent",
+                AgentTask::new("t-depth", "hello"),
+                &execution()
+            ),
             Err(AgentError::DelegationDepthExceeded)
         );
     }
@@ -528,7 +633,14 @@ mod tests {
         agents.register(Arc::new(CapabilityAgent)).unwrap();
         let mut runtime = empty_runtime();
         runtime.register(Arc::new(TextExtension)).unwrap();
-        let result = agents.execute(&runtime, "agent.writer", AgentTask::new("t4", "hello"), &execution()).unwrap();
+        let result = agents
+            .execute(
+                &runtime,
+                "agent.writer",
+                AgentTask::new("t4", "hello"),
+                &execution(),
+            )
+            .unwrap();
         assert_eq!(result.output, "HELLO");
     }
 
@@ -537,17 +649,32 @@ mod tests {
         struct Unprivileged;
         impl Agent for Unprivileged {
             fn manifest(&self) -> AgentManifest {
-                AgentManifest { id: "agent.unprivileged".into(), version: "1.0.0".into(), api_version: AGENT_API_VERSION, capabilities: vec![] }
+                AgentManifest {
+                    id: "agent.unprivileged".into(),
+                    version: "1.0.0".into(),
+                    api_version: AGENT_API_VERSION,
+                    capabilities: vec![],
+                }
             }
-            fn execute(&self, _task: AgentTask, context: &AgentContext<'_>) -> Result<AgentResponse, AgentError> {
-                context.execute_capability(CapabilityId::new("text.transform").unwrap(), "no")
+            fn execute(
+                &self,
+                _task: AgentTask,
+                context: &AgentContext<'_>,
+            ) -> Result<AgentResponse, AgentError> {
+                context
+                    .execute_capability(CapabilityId::new("text.transform").unwrap(), "no")
                     .map(|response| AgentResponse::text(response.output))
             }
         }
         let mut agents = AgentRuntime::default();
         agents.register(Arc::new(Unprivileged)).unwrap();
         assert_eq!(
-            agents.execute(&empty_runtime(), "agent.unprivileged", AgentTask::new("t5", "x"), &execution()),
+            agents.execute(
+                &empty_runtime(),
+                "agent.unprivileged",
+                AgentTask::new("t5", "x"),
+                &execution()
+            ),
             Err(AgentError::CapabilityDenied("text.transform".into()))
         );
     }
@@ -559,13 +686,25 @@ mod tests {
             max_task_output_bytes: 2,
             max_delegation_depth: 1,
         });
-        agents.register(Arc::new(EchoAgent { id: "agent.echo" })).unwrap();
+        agents
+            .register(Arc::new(EchoAgent { id: "agent.echo" }))
+            .unwrap();
         assert_eq!(
-            agents.execute(&empty_runtime(), "agent.echo", AgentTask::new("t6", "long"), &execution()),
+            agents.execute(
+                &empty_runtime(),
+                "agent.echo",
+                AgentTask::new("t6", "long"),
+                &execution()
+            ),
             Err(AgentError::InputTooLarge)
         );
         assert_eq!(
-            agents.execute(&empty_runtime(), "agent.echo", AgentTask::new("t7", "abc"), &execution()),
+            agents.execute(
+                &empty_runtime(),
+                "agent.echo",
+                AgentTask::new("t7", "abc"),
+                &execution()
+            ),
             Err(AgentError::OutputTooLarge)
         );
     }
@@ -573,17 +712,23 @@ mod tests {
     #[test]
     fn rejects_cancelled_tasks_before_agent_execution() {
         let mut agents = AgentRuntime::default();
-        agents.register(Arc::new(EchoAgent { id: "agent.echo" })).unwrap();
+        agents
+            .register(Arc::new(EchoAgent { id: "agent.echo" }))
+            .unwrap();
         let token = CancellationToken::new();
         token.cancel();
         let context = ExecutionContext::new(token, None, usize::MAX);
         assert_eq!(
-            agents.execute(&empty_runtime(), "agent.echo", AgentTask::new("t8", "hello"), &context),
+            agents.execute(
+                &empty_runtime(),
+                "agent.echo",
+                AgentTask::new("t8", "hello"),
+                &context
+            ),
             Err(AgentError::Cancelled)
         );
     }
 }
-
 
 mod orchestration;
 pub use orchestration::{AgentPlan, PlanError, PlanNode, PlanResult, MAX_PLAN_NODES};

@@ -58,8 +58,15 @@ pub struct TaskPlan {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RoutingError {
     NoProvider(String),
-    IncompatibleApi { extension_id: String, required: u16, provided: u16 },
-    PreferredProviderUnavailable { requested: String, capability: String },
+    IncompatibleApi {
+        extension_id: String,
+        required: u16,
+        provided: u16,
+    },
+    PreferredProviderUnavailable {
+        requested: String,
+        capability: String,
+    },
 }
 
 impl fmt::Display for RoutingError {
@@ -100,7 +107,11 @@ impl std::error::Error for IntelligenceError {}
 pub struct IntelligenceRouter;
 
 impl IntelligenceRouter {
-    pub fn discover(&self, runtime: &Runtime, capability: &CapabilityId) -> Vec<ExtensionDescriptor> {
+    pub fn discover(
+        &self,
+        runtime: &Runtime,
+        capability: &CapabilityId,
+    ) -> Vec<ExtensionDescriptor> {
         runtime.discover_capability(capability)
     }
 
@@ -111,7 +122,9 @@ impl IntelligenceRouter {
         }
 
         let selected = if let Some(preferred) = &intent.preferred_extension {
-            providers.iter().find(|provider| &provider.extension_id == preferred)
+            providers
+                .iter()
+                .find(|provider| &provider.extension_id == preferred)
                 .ok_or_else(|| RoutingError::PreferredProviderUnavailable {
                     requested: preferred.clone(),
                     capability: intent.capability.to_string(),
@@ -143,8 +156,14 @@ impl IntelligenceRouter {
     }
 
     /// Plans first, then dispatches through runtime policy and lifecycle controls.
-    pub fn execute(&self, runtime: &Runtime, intent: TaskIntent) -> Result<ExtensionResponse, IntelligenceError> {
-        let plan = self.plan(runtime, &intent).map_err(IntelligenceError::Routing)?;
+    pub fn execute(
+        &self,
+        runtime: &Runtime,
+        intent: TaskIntent,
+    ) -> Result<ExtensionResponse, IntelligenceError> {
+        let plan = self
+            .plan(runtime, &intent)
+            .map_err(IntelligenceError::Routing)?;
         let mut request = ExtensionRequest::new(plan.capability, intent.input);
         request.correlation_id = intent.correlation_id;
         runtime.execute(request).map_err(IntelligenceError::Runtime)
@@ -157,10 +176,14 @@ impl IntelligenceRouter {
         intent: TaskIntent,
         context: &ExecutionContext,
     ) -> Result<ExtensionResponse, IntelligenceError> {
-        let plan = self.plan(runtime, &intent).map_err(IntelligenceError::Routing)?;
+        let plan = self
+            .plan(runtime, &intent)
+            .map_err(IntelligenceError::Routing)?;
         let mut request = ExtensionRequest::new(plan.capability, intent.input);
         request.correlation_id = intent.correlation_id;
-        runtime.execute_with_context(request, context).map_err(IntelligenceError::Runtime)
+        runtime
+            .execute_with_context(request, context)
+            .map_err(IntelligenceError::Runtime)
     }
 }
 
@@ -211,7 +234,10 @@ mod tests {
         let plan = IntelligenceRouter.plan(&runtime, &intent).unwrap();
         assert_eq!(plan.extension_id, "example.echo");
         assert_eq!(plan.extension_version, "1.2.0");
-        assert_eq!(IntelligenceRouter.execute(&runtime, intent).unwrap().output, "hello");
+        assert_eq!(
+            IntelligenceRouter.execute(&runtime, intent).unwrap().output,
+            "hello"
+        );
     }
 
     #[test]

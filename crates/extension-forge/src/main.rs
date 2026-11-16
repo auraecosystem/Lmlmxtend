@@ -3,7 +3,9 @@ use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
-const CATEGORIES: &[&str] = &["creative", "language", "vision", "audio", "spatial", "agents"];
+const CATEGORIES: &[&str] = &[
+    "creative", "language", "vision", "audio", "spatial", "agents",
+];
 
 fn main() {
     if let Err(error) = run() {
@@ -16,8 +18,13 @@ fn run() -> Result<(), String> {
     let mut args = env::args().skip(1);
     match args.next().as_deref() {
         Some("new") => create_extension(args.collect()),
-        Some("help") | Some("--help") | Some("-h") | None => { print_help(); Ok(()) }
-        Some(command) => Err(format!("unknown command '{command}'. Run 'lmlmxtend-forge help'.")),
+        Some("help") | Some("--help") | Some("-h") | None => {
+            print_help();
+            Ok(())
+        }
+        Some(command) => Err(format!(
+            "unknown command '{command}'. Run 'lmlmxtend-forge help'."
+        )),
     }
 }
 
@@ -43,7 +50,9 @@ fn create_extension(args: Vec<String>) -> Result<(), String> {
     let mut root = PathBuf::from("extensions");
     let mut iter = args.into_iter();
     while let Some(flag) = iter.next() {
-        let value = iter.next().ok_or_else(|| format!("missing value for {flag}"))?;
+        let value = iter
+            .next()
+            .ok_or_else(|| format!("missing value for {flag}"))?;
         match flag.as_str() {
             "--name" => name = Some(value),
             "--category" => category = Some(value),
@@ -57,18 +66,28 @@ fn create_extension(args: Vec<String>) -> Result<(), String> {
     let category = category.ok_or("required option: --category")?;
     let capability = capability.ok_or("required option: --capability")?;
     validate_slug(&name)?;
-    if root.is_absolute() || root.components().any(|part| matches!(part, Component::ParentDir)) {
+    if root.is_absolute()
+        || root
+            .components()
+            .any(|part| matches!(part, Component::ParentDir))
+    {
         return Err("--root must be a repository-relative path without '..' components".into());
     }
     if !CATEGORIES.contains(&category.as_str()) {
-        return Err(format!("unsupported category '{category}'. Choose: {}", CATEGORIES.join(", ")));
+        return Err(format!(
+            "unsupported category '{category}'. Choose: {}",
+            CATEGORIES.join(", ")
+        ));
     }
     validate_capability(&capability)?;
 
     let extension_id = format!("{category}.{name}");
     let destination = root.join(&category).join(&name);
     if destination.exists() {
-        return Err(format!("{} already exists; refusing to overwrite it", destination.display()));
+        return Err(format!(
+            "{} already exists; refusing to overwrite it",
+            destination.display()
+        ));
     }
     let api_path = relative_api_path(&destination);
     let manifest = format!(
@@ -77,7 +96,8 @@ fn create_extension(args: Vec<String>) -> Result<(), String> {
     let cargo = format!(
         "[package]\nname = \"lmlmxtend-{name}\"\nversion = \"0.1.0\"\nedition = \"2021\"\nlicense = \"MIT\"\ndescription = \"LMLMxtend {category} extension: {name}\"\n\n[dependencies]\nlmlmxtend-api = {{ path = \"{api_path}\" }}\n\n[workspace]\n"
     );
-    let source = format!(r#"//! Generated LMLMxtend extension. Replace the example behavior with your implementation.
+    let source = format!(
+        r#"//! Generated LMLMxtend extension. Replace the example behavior with your implementation.
 
 use lmlmxtend_api::{{
     CapabilityId, Extension, ExtensionError, ExtensionManifest, ExtensionRequest,
@@ -130,7 +150,9 @@ mod tests {{
         assert!(response.output.contains("5 bytes"));
     }}
 }}
-"#, type_name = to_type_name(&name));
+"#,
+        type_name = to_type_name(&name)
+    );
 
     fs::create_dir_all(destination.join("src")).map_err(|e| e.to_string())?;
     write_new(&destination.join("Cargo.toml"), &cargo)?;
@@ -143,24 +165,36 @@ mod tests {{
     println!("Created extension: {}", destination.display());
     println!("Extension ID: {extension_id}");
     println!("Capability: {capability}");
-    println!("Next: cargo test --manifest-path {}/Cargo.toml", destination.display());
+    println!(
+        "Next: cargo test --manifest-path {}/Cargo.toml",
+        destination.display()
+    );
     Ok(())
 }
 
 fn write_new(path: &Path, content: &str) -> Result<(), String> {
-    let mut file = OpenOptions::new().write(true).create_new(true).open(path)
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
         .map_err(|e| format!("cannot create {}: {e}", path.display()))?;
-    file.write_all(content.as_bytes()).map_err(|e| e.to_string())
+    file.write_all(content.as_bytes())
+        .map_err(|e| e.to_string())
 }
 
 fn validate_slug(value: &str) -> Result<(), String> {
-    let valid = !value.is_empty() && value.len() <= 48
+    let valid = !value.is_empty()
+        && value.len() <= 48
         && value.split('-').all(|part| {
             !part.is_empty()
                 && part.as_bytes()[0].is_ascii_lowercase()
-                && part.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit())
+                && part
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit())
         });
-    if valid { Ok(()) } else {
+    if valid {
+        Ok(())
+    } else {
         Err("name must be 1-48 lowercase ASCII letters, digits, or hyphens; it must start with a letter".into())
     }
 }
@@ -172,13 +206,16 @@ fn validate_capability(value: &str) -> Result<(), String> {
 }
 
 fn to_type_name(value: &str) -> String {
-    value.split('-').map(|part| {
-        let mut chars = part.chars();
-        match chars.next() {
-            Some(first) => first.to_ascii_uppercase().to_string() + chars.as_str(),
-            None => String::new(),
-        }
-    }).collect()
+    value
+        .split('-')
+        .map(|part| {
+            let mut chars = part.chars();
+            match chars.next() {
+                Some(first) => first.to_ascii_uppercase().to_string() + chars.as_str(),
+                None => String::new(),
+            }
+        })
+        .collect()
 }
 
 fn relative_api_path(destination: &Path) -> String {
@@ -213,6 +250,9 @@ mod tests {
 
     #[test]
     fn computes_api_path_from_default_extension_root() {
-        assert_eq!(relative_api_path(Path::new("extensions/creative/scene-composer")), "../../../crates/lmlmxtend-api");
+        assert_eq!(
+            relative_api_path(Path::new("extensions/creative/scene-composer")),
+            "../../../crates/lmlmxtend-api"
+        );
     }
 }

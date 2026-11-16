@@ -1,10 +1,13 @@
 //! Minimal in-process extension host. This is not an isolation boundary.
 
-use lmlmxtend_api::{CapabilityId, ExecutionContext, Extension, ExtensionError, ExtensionManifest, ExtensionRequest, ExtensionResponse};
+use lmlmxtend_api::{
+    CapabilityId, ExecutionContext, Extension, ExtensionError, ExtensionManifest, ExtensionRequest,
+    ExtensionResponse,
+};
 use lmlmxtend_core::{ExecutionPolicy, PolicyDecision, RuntimeConfig};
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Arc;
 use std::fmt;
+use std::sync::Arc;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RuntimeError {
@@ -79,10 +82,14 @@ impl Runtime {
     pub fn register(&mut self, extension: Arc<dyn Extension>) -> Result<(), RuntimeError> {
         let manifest: ExtensionManifest = extension.manifest();
         if manifest.id.trim().is_empty() || manifest.version.trim().is_empty() {
-            return Err(RuntimeError::InvalidManifest("id and version are required".into()));
+            return Err(RuntimeError::InvalidManifest(
+                "id and version are required".into(),
+            ));
         }
         if manifest.api_version != lmlmxtend_api::API_VERSION {
-            return Err(RuntimeError::InvalidManifest("incompatible API version".into()));
+            return Err(RuntimeError::InvalidManifest(
+                "incompatible API version".into(),
+            ));
         }
         if self.extensions.contains_key(&manifest.id) {
             return Err(RuntimeError::DuplicateExtension(manifest.id));
@@ -111,12 +118,21 @@ impl Runtime {
 
     /// Probes registered extensions in stable ID order without changing registry state.
     pub fn health_report(&self) -> Vec<ExtensionHealth> {
-        self.extensions.iter().map(|(id, extension)| {
-            match extension.health_check() {
-                Ok(()) => ExtensionHealth { extension_id: id.clone(), healthy: true, error: None },
-                Err(error) => ExtensionHealth { extension_id: id.clone(), healthy: false, error: Some(error.to_string()) },
-            }
-        }).collect()
+        self.extensions
+            .iter()
+            .map(|(id, extension)| match extension.health_check() {
+                Ok(()) => ExtensionHealth {
+                    extension_id: id.clone(),
+                    healthy: true,
+                    error: None,
+                },
+                Err(error) => ExtensionHealth {
+                    extension_id: id.clone(),
+                    healthy: false,
+                    error: Some(error.to_string()),
+                },
+            })
+            .collect()
     }
 
     /// Returns stable, read-only metadata for registered extensions.
@@ -126,21 +142,29 @@ impl Runtime {
 
     /// Finds registered providers for an exact capability identifier.
     pub fn discover_capability(&self, capability: &CapabilityId) -> Vec<ExtensionDescriptor> {
-        self.descriptors.values()
+        self.descriptors
+            .values()
             .filter(|extension| extension.capabilities.contains(capability))
             .cloned()
             .collect()
     }
 
     /// Number of registered extensions.
-    pub fn extension_count(&self) -> usize { self.extensions.len() }
+    pub fn extension_count(&self) -> usize {
+        self.extensions.len()
+    }
 
     /// Dispatches a request only when the extension declared the capability
     /// and host policy permits the request.
     pub fn execute(&self, request: ExtensionRequest) -> Result<ExtensionResponse, RuntimeError> {
-        self.execute_with_context(request, &ExecutionContext::new(
-            lmlmxtend_api::CancellationToken::new(), None, self.max_output_bytes
-        ))
+        self.execute_with_context(
+            request,
+            &ExecutionContext::new(
+                lmlmxtend_api::CancellationToken::new(),
+                None,
+                self.max_output_bytes,
+            ),
+        )
     }
 
     /// Dispatches with cooperative cancellation/deadline controls and a host-enforced output cap.
@@ -152,7 +176,9 @@ impl Runtime {
     ) -> Result<ExtensionResponse, RuntimeError> {
         context.check_cancelled().map_err(|error| match error {
             lmlmxtend_api::ExecutionControlError::Cancelled => RuntimeError::Cancelled,
-            lmlmxtend_api::ExecutionControlError::DeadlineExceeded => RuntimeError::DeadlineExceeded,
+            lmlmxtend_api::ExecutionControlError::DeadlineExceeded => {
+                RuntimeError::DeadlineExceeded
+            }
             lmlmxtend_api::ExecutionControlError::OutputTooLarge => RuntimeError::OutputTooLarge,
         })?;
         match self.policy.evaluate(&request.capability, &request.input) {
@@ -161,9 +187,13 @@ impl Runtime {
                 return Err(RuntimeError::PolicyDenied);
             }
         }
-        let owner = self.capabilities.get(&request.capability)
+        let owner = self
+            .capabilities
+            .get(&request.capability)
             .ok_or_else(|| RuntimeError::CapabilityNotDeclared(request.capability.to_string()))?;
-        let extension = self.extensions.get(owner)
+        let extension = self
+            .extensions
+            .get(owner)
             .ok_or_else(|| RuntimeError::ExtensionNotFound(owner.clone()))?;
         let bounded_context = context.limited_to_output(self.max_output_bytes);
         let response = match extension.execute_with_context(request, &bounded_context) {
@@ -172,15 +202,21 @@ impl Runtime {
                 // Prefer lifecycle errors when cooperative extension work observes them.
                 context.check_cancelled().map_err(|control| match control {
                     lmlmxtend_api::ExecutionControlError::Cancelled => RuntimeError::Cancelled,
-                    lmlmxtend_api::ExecutionControlError::DeadlineExceeded => RuntimeError::DeadlineExceeded,
-                    lmlmxtend_api::ExecutionControlError::OutputTooLarge => RuntimeError::OutputTooLarge,
+                    lmlmxtend_api::ExecutionControlError::DeadlineExceeded => {
+                        RuntimeError::DeadlineExceeded
+                    }
+                    lmlmxtend_api::ExecutionControlError::OutputTooLarge => {
+                        RuntimeError::OutputTooLarge
+                    }
                 })?;
                 return Err(RuntimeError::Extension(error));
             }
         };
         context.check_cancelled().map_err(|error| match error {
             lmlmxtend_api::ExecutionControlError::Cancelled => RuntimeError::Cancelled,
-            lmlmxtend_api::ExecutionControlError::DeadlineExceeded => RuntimeError::DeadlineExceeded,
+            lmlmxtend_api::ExecutionControlError::DeadlineExceeded => {
+                RuntimeError::DeadlineExceeded
+            }
             lmlmxtend_api::ExecutionControlError::OutputTooLarge => RuntimeError::OutputTooLarge,
         })?;
         if response.output.len() > self.max_output_bytes.min(context.max_output_bytes()) {
@@ -212,7 +248,6 @@ mod tests {
             Ok(ExtensionResponse::text(request.input))
         }
     }
-
 
     struct Unhealthy;
 
@@ -249,7 +284,10 @@ mod tests {
         assert_eq!(report[0].error, None);
         assert_eq!(report[1].extension_id, "example.unhealthy");
         assert!(!report[1].healthy);
-        assert_eq!(report[1].error.as_deref(), Some("extension execution failed: not ready"));
+        assert_eq!(
+            report[1].error.as_deref(),
+            Some("extension execution failed: not ready")
+        );
     }
 
     #[test]
@@ -295,7 +333,10 @@ mod tests {
                 }
             }
 
-            fn execute(&self, request: ExtensionRequest) -> Result<ExtensionResponse, ExtensionError> {
+            fn execute(
+                &self,
+                request: ExtensionRequest,
+            ) -> Result<ExtensionResponse, ExtensionError> {
                 Ok(ExtensionResponse::text(request.input))
             }
         }
@@ -306,12 +347,13 @@ mod tests {
             Err(RuntimeError::DuplicateCapability("text.echo".into()))
         );
         // Failed registration is atomic: the rejected extension owns no capability.
-        assert!(runtime.execute(ExtensionRequest::new(
-            CapabilityId::new("text.echo").unwrap(),
-            "hello"
-        )).is_err());
+        assert!(runtime
+            .execute(ExtensionRequest::new(
+                CapabilityId::new("text.echo").unwrap(),
+                "hello"
+            ))
+            .is_err());
     }
-
 
     #[test]
     fn rejects_pre_cancelled_execution_before_dispatch() {
@@ -321,7 +363,10 @@ mod tests {
         token.cancel();
         let context = ExecutionContext::new(token, None, usize::MAX);
         let request = ExtensionRequest::new(CapabilityId::new("text.echo").unwrap(), "hello");
-        assert_eq!(runtime.execute_with_context(request, &context), Err(RuntimeError::Cancelled));
+        assert_eq!(
+            runtime.execute_with_context(request, &context),
+            Err(RuntimeError::Cancelled)
+        );
     }
 
     #[test]
@@ -330,12 +375,19 @@ mod tests {
         runtime.register(Arc::new(Echo)).unwrap();
         let context = ExecutionContext::with_timeout(std::time::Duration::ZERO, usize::MAX);
         let request = ExtensionRequest::new(CapabilityId::new("text.echo").unwrap(), "hello");
-        assert_eq!(runtime.execute_with_context(request, &context), Err(RuntimeError::DeadlineExceeded));
+        assert_eq!(
+            runtime.execute_with_context(request, &context),
+            Err(RuntimeError::DeadlineExceeded)
+        );
     }
 
     #[test]
     fn enforces_host_output_limit() {
-        let config = RuntimeConfig { max_input_bytes: 32, max_output_bytes: 2, allowed_capabilities: None };
+        let config = RuntimeConfig {
+            max_input_bytes: 32,
+            max_output_bytes: 2,
+            allowed_capabilities: None,
+        };
         let mut runtime = Runtime::new(config);
         runtime.register(Arc::new(Echo)).unwrap();
         let request = ExtensionRequest::new(CapabilityId::new("text.echo").unwrap(), "hey");
@@ -344,7 +396,11 @@ mod tests {
 
     #[test]
     fn rejects_input_over_configured_limit() {
-        let config = RuntimeConfig { max_input_bytes: 3, max_output_bytes: 1_048_576, allowed_capabilities: None };
+        let config = RuntimeConfig {
+            max_input_bytes: 3,
+            max_output_bytes: 1_048_576,
+            allowed_capabilities: None,
+        };
         let mut runtime = Runtime::new(config);
         runtime.register(Arc::new(Echo)).unwrap();
         let request = ExtensionRequest::new(CapabilityId::new("text.echo").unwrap(), "long");

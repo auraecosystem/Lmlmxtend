@@ -17,16 +17,26 @@ impl CapabilityId {
             && value.len() <= 128
             && value.split('.').all(|part| {
                 !part.is_empty()
-                    && part.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
+                    && part.chars().all(|c| {
+                        c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_'
+                    })
             });
-        if valid { Ok(Self(value)) } else { Err(ContractError::InvalidCapabilityId) }
+        if valid {
+            Ok(Self(value))
+        } else {
+            Err(ContractError::InvalidCapabilityId)
+        }
     }
 
-    pub fn as_str(&self) -> &str { &self.0 }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 impl fmt::Display for CapabilityId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.write_str(&self.0) }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
 }
 
 /// A request passed to an installed extension.
@@ -39,7 +49,11 @@ pub struct ExtensionRequest {
 
 impl ExtensionRequest {
     pub fn new(capability: CapabilityId, input: impl Into<String>) -> Self {
-        Self { capability, input: input.into(), correlation_id: None }
+        Self {
+            capability,
+            input: input.into(),
+            correlation_id: None,
+        }
     }
 }
 
@@ -52,7 +66,10 @@ pub struct ExtensionResponse {
 
 impl ExtensionResponse {
     pub fn text(output: impl Into<String>) -> Self {
-        Self { output: output.into(), media_type: "text/plain; charset=utf-8".into() }
+        Self {
+            output: output.into(),
+            media_type: "text/plain; charset=utf-8".into(),
+        }
     }
 }
 
@@ -65,13 +82,14 @@ pub struct ExtensionManifest {
     pub capabilities: Vec<CapabilityId>,
 }
 
-
 /// Cooperative cancellation signal shared by a host and an extension.
 #[derive(Clone, Debug, Default)]
 pub struct CancellationToken(std::sync::Arc<std::sync::atomic::AtomicBool>);
 
 impl CancellationToken {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
     pub fn cancel(&self) {
         self.0.store(true, std::sync::atomic::Ordering::Release);
     }
@@ -91,23 +109,46 @@ pub struct ExecutionContext {
 
 impl Default for ExecutionContext {
     fn default() -> Self {
-        Self { cancellation: CancellationToken::new(), deadline: None, max_output_bytes: usize::MAX }
+        Self {
+            cancellation: CancellationToken::new(),
+            deadline: None,
+            max_output_bytes: usize::MAX,
+        }
     }
 }
 
 impl ExecutionContext {
-    pub fn new(cancellation: CancellationToken, deadline: Option<std::time::Instant>, max_output_bytes: usize) -> Self {
-        Self { cancellation, deadline, max_output_bytes }
+    pub fn new(
+        cancellation: CancellationToken,
+        deadline: Option<std::time::Instant>,
+        max_output_bytes: usize,
+    ) -> Self {
+        Self {
+            cancellation,
+            deadline,
+            max_output_bytes,
+        }
     }
     pub fn with_timeout(timeout: std::time::Duration, max_output_bytes: usize) -> Self {
-        Self::new(CancellationToken::new(), Some(std::time::Instant::now() + timeout), max_output_bytes)
+        Self::new(
+            CancellationToken::new(),
+            Some(std::time::Instant::now() + timeout),
+            max_output_bytes,
+        )
     }
-    pub fn cancellation_token(&self) -> CancellationToken { self.cancellation.clone() }
-    pub fn is_cancelled(&self) -> bool { self.cancellation.is_cancelled() }
+    pub fn cancellation_token(&self) -> CancellationToken {
+        self.cancellation.clone()
+    }
+    pub fn is_cancelled(&self) -> bool {
+        self.cancellation.is_cancelled()
+    }
     pub fn is_deadline_exceeded(&self) -> bool {
-        self.deadline.is_some_and(|deadline| std::time::Instant::now() >= deadline)
+        self.deadline
+            .is_some_and(|deadline| std::time::Instant::now() >= deadline)
     }
-    pub fn max_output_bytes(&self) -> usize { self.max_output_bytes }
+    pub fn max_output_bytes(&self) -> usize {
+        self.max_output_bytes
+    }
     pub fn limited_to_output(&self, max_output_bytes: usize) -> Self {
         let mut context = self.clone();
         context.max_output_bytes = context.max_output_bytes.min(max_output_bytes);
@@ -115,15 +156,23 @@ impl ExecutionContext {
     }
     /// Extensions should call this between bounded units of work.
     pub fn check_cancelled(&self) -> Result<(), ExecutionControlError> {
-        if self.is_cancelled() { return Err(ExecutionControlError::Cancelled); }
-        if self.is_deadline_exceeded() { return Err(ExecutionControlError::DeadlineExceeded); }
+        if self.is_cancelled() {
+            return Err(ExecutionControlError::Cancelled);
+        }
+        if self.is_deadline_exceeded() {
+            return Err(ExecutionControlError::DeadlineExceeded);
+        }
         Ok(())
     }
 }
 
 /// Host-enforced request lifecycle failures.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ExecutionControlError { Cancelled, DeadlineExceeded, OutputTooLarge }
+pub enum ExecutionControlError {
+    Cancelled,
+    DeadlineExceeded,
+    OutputTooLarge,
+}
 
 impl fmt::Display for ExecutionControlError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -143,14 +192,22 @@ pub trait Extension: Send + Sync {
 
     /// Performs a lightweight readiness check. Implementations should not start
     /// expensive work or mutate extension state from this method.
-    fn health_check(&self) -> Result<(), ExtensionError> { Ok(()) }
+    fn health_check(&self) -> Result<(), ExtensionError> {
+        Ok(())
+    }
 
     fn execute(&self, request: ExtensionRequest) -> Result<ExtensionResponse, ExtensionError>;
 
     /// Context-aware execution. The default preserves compatibility but cannot
     /// interrupt legacy implementations; cooperative extensions should override it.
-    fn execute_with_context(&self, request: ExtensionRequest, context: &ExecutionContext) -> Result<ExtensionResponse, ExtensionError> {
-        context.check_cancelled().map_err(|error| ExtensionError::ExecutionFailed(error.to_string()))?;
+    fn execute_with_context(
+        &self,
+        request: ExtensionRequest,
+        context: &ExecutionContext,
+    ) -> Result<ExtensionResponse, ExtensionError> {
+        context
+            .check_cancelled()
+            .map_err(|error| ExtensionError::ExecutionFailed(error.to_string()))?;
         self.execute(request)
     }
 }
@@ -204,11 +261,17 @@ mod tests {
 
     #[test]
     fn accepts_namespaced_capability() {
-        assert_eq!(CapabilityId::new("creative.generate").unwrap().as_str(), "creative.generate");
+        assert_eq!(
+            CapabilityId::new("creative.generate").unwrap().as_str(),
+            "creative.generate"
+        );
     }
 
     #[test]
     fn rejects_malformed_capability() {
-        assert_eq!(CapabilityId::new("Creative..generate"), Err(ContractError::InvalidCapabilityId));
+        assert_eq!(
+            CapabilityId::new("Creative..generate"),
+            Err(ContractError::InvalidCapabilityId)
+        );
     }
 }

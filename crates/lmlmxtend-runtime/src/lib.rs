@@ -136,6 +136,53 @@ mod tests {
         }
     }
 
+
+    struct Unhealthy;
+
+    impl Extension for Unhealthy {
+        fn manifest(&self) -> ExtensionManifest {
+            ExtensionManifest {
+                id: "example.unhealthy".into(),
+                version: "0.1.0".into(),
+                api_version: lmlmxtend_api::API_VERSION,
+                capabilities: vec![],
+            }
+        }
+
+        fn health_check(&self) -> Result<(), ExtensionError> {
+            Err(ExtensionError::ExecutionFailed("not ready".into()))
+        }
+
+        fn execute(&self, request: ExtensionRequest) -> Result<ExtensionResponse, ExtensionError> {
+            Ok(ExtensionResponse::text(request.input))
+        }
+    }
+
+    #[test]
+    fn health_report_includes_healthy_and_unhealthy_extensions() {
+        let mut runtime = Runtime::new(RuntimeConfig::default());
+        runtime.register(Arc::new(Echo)).unwrap();
+        runtime.register(Arc::new(Unhealthy)).unwrap();
+
+        let report = runtime.health_report();
+        assert_eq!(runtime.extension_count(), 2);
+        assert_eq!(report.len(), 2);
+        assert_eq!(report[0].extension_id, "example.echo");
+        assert!(report[0].healthy);
+        assert_eq!(report[0].error, None);
+        assert_eq!(report[1].extension_id, "example.unhealthy");
+        assert!(!report[1].healthy);
+        assert_eq!(report[1].error.as_deref(), Some("extension execution failed: not ready"));
+    }
+
+    #[test]
+    fn runtime_errors_have_readable_messages() {
+        assert_eq!(
+            RuntimeError::PolicyDenied.to_string(),
+            "request denied by runtime policy"
+        );
+    }
+
     #[test]
     fn registers_and_dispatches_declared_capability() {
         let mut runtime = Runtime::new(RuntimeConfig::default());

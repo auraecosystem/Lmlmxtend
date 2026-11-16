@@ -117,6 +117,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn extension_errors_have_readable_messages() {
+        assert_eq!(
+            ExtensionError::UnsupportedOperation.to_string(),
+            "extension operation is unsupported"
+        );
+    }
+
+    #[test]
     fn accepts_namespaced_capability() {
         assert_eq!(CapabilityId::new("creative.generate").unwrap().as_str(), "creative.generate");
     }

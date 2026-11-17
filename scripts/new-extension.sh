@@ -9,4 +9,4 @@ if [[ $# -lt 1 ]]; then
   exit 2
 fi
 
-cargo run -p lmlmxtend-extension-forge -- new -- "$@"
+cargo run -p lmlmxtend-extension-forge -- new "$@"

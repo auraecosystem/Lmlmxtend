@@ -311,7 +311,9 @@ mod tests {
                 &execution_context(),
                 1,
             ),
-            Err(GoalExecutionError::Planning(GoalPlanningError::PlanTooLarge))
+            Err(GoalExecutionError::Planning(
+                GoalPlanningError::PlanTooLarge
+            ))
         );
     }
 

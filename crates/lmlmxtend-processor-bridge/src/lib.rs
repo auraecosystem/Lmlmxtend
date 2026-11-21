@@ -6,8 +6,8 @@
 //! currently exposes UTF-8 text requests through the existing string-based contract.
 
 use lmlmxtend_api::{
-    CapabilityId, ExecutionContext, Extension, ExtensionError, ExtensionManifest,
-    ExtensionRequest, ExtensionResponse,
+    CapabilityId, ExecutionContext, Extension, ExtensionError, ExtensionManifest, ExtensionRequest,
+    ExtensionResponse,
 };
 use std::fmt;
 use std::sync::Arc;
@@ -155,10 +155,8 @@ impl Extension for ProcessorBridge {
             id: Self::EXTENSION_ID.into(),
             version: env!("CARGO_PKG_VERSION").into(),
             api_version: lmlmxtend_api::API_VERSION,
-            capabilities: vec![
-                CapabilityId::new(Self::CAPABILITY_ID)
-                    .expect("the bridge capability identifier is static and valid"),
-            ],
+            capabilities: vec![CapabilityId::new(Self::CAPABILITY_ID)
+                .expect("the bridge capability identifier is static and valid")],
         }
     }
 
@@ -211,10 +209,16 @@ impl fmt::Display for ProcessorBridgeError {
         match self {
             Self::ExecutionControl(error) => write!(f, "{error}"),
             Self::RequestTooLarge { actual, limit } => {
-                write!(f, "processor request is too large: {actual} bytes (limit {limit})")
+                write!(
+                    f,
+                    "processor request is too large: {actual} bytes (limit {limit})"
+                )
             }
             Self::OutputTooLarge { actual, limit } => {
-                write!(f, "processor output is too large: {actual} bytes (limit {limit})")
+                write!(
+                    f,
+                    "processor output is too large: {actual} bytes (limit {limit})"
+                )
             }
             Self::Processor(error) => write!(f, "{error}"),
         }
@@ -303,9 +307,7 @@ mod tests {
             .unwrap_err();
         assert_eq!(
             error,
-            ProcessorBridgeError::ExecutionControl(
-                lmlmxtend_api::ExecutionControlError::Cancelled
-            )
+            ProcessorBridgeError::ExecutionControl(lmlmxtend_api::ExecutionControlError::Cancelled)
         );
     }
 }

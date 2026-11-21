@@ -5,6 +5,49 @@ use std::fmt;
 /// Contract version implemented by this API crate.
 pub const API_VERSION: u16 = 1;
 
+/// A validated, namespaced extension identity (for example, `creative.scene-composer`).
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct ExtensionId(String);
+
+impl ExtensionId {
+    /// Creates an identity with at least a namespace and a name.
+    pub fn new(value: impl Into<String>) -> Result<Self, ContractError> {
+        let value = value.into();
+        let valid = value.len() <= 128
+            && value.split('.').count() >= 2
+            && value.split('.').all(|part| {
+                !part.is_empty()
+                    && part.len() <= 48
+                    && part.as_bytes()[0].is_ascii_lowercase()
+                    && part
+                        .as_bytes()
+                        .last()
+                        .is_some_and(|byte| byte.is_ascii_alphanumeric())
+                    && part.bytes().all(|byte| {
+                        byte.is_ascii_lowercase()
+                            || byte.is_ascii_digit()
+                            || byte == b'-'
+                            || byte == b'_'
+                    })
+            });
+        if valid {
+            Ok(Self(value))
+        } else {
+            Err(ContractError::InvalidExtensionId)
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for ExtensionId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
 /// A validated, namespaced capability identifier.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct CapabilityId(String);
@@ -235,12 +278,14 @@ impl std::error::Error for ExtensionError {}
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ContractError {
     InvalidCapabilityId,
+    InvalidExtensionId,
 }
 
 impl fmt::Display for ContractError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidCapabilityId => f.write_str("invalid capability identifier"),
+            Self::InvalidExtensionId => f.write_str("invalid extension identifier"),
         }
     }
 }
@@ -257,6 +302,21 @@ mod tests {
             ExtensionError::UnsupportedOperation.to_string(),
             "extension operation is unsupported"
         );
+    }
+
+    #[test]
+    fn validates_extension_ids() {
+        assert_eq!(
+            ExtensionId::new("creative.scene-composer")
+                .unwrap()
+                .as_str(),
+            "creative.scene-composer"
+        );
+        assert!(ExtensionId::new("single").is_err());
+        assert!(ExtensionId::new("Creative.scene").is_err());
+        assert!(ExtensionId::new("creative..scene").is_err());
+        assert!(ExtensionId::new("creative.-scene").is_err());
+        assert!(ExtensionId::new("creative.scene-").is_err());
     }
 
     #[test]

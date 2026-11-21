@@ -245,7 +245,7 @@ mod tests {
 
     #[test]
     fn sends_versioned_request_to_loopback_service() {
-        use std::io::Read;
+        use std::io::{Read, Write};
         use std::net::TcpListener;
         use std::thread;
 

@@ -6,7 +6,7 @@ It provides stable contracts and application-facing capabilities without reimple
 
 ## Project boundaries
 
-- **LMLM** — the Large Multi-Functional Linear Model: the in-built neural processor and intelligence core.
+- **LMLM** — the Large Multimodal Local Model: the in-built neural processor and intelligence core.
 - **LMLMxtend** — extension contracts, capability orchestration, runtime services, multimodal interfaces, agents, adapters, and SDKs.
 - **Olgin** — a creative application that may consume LMLMxtend through an optional integration.
 

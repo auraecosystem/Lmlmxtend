@@ -4,7 +4,7 @@
 
 use lmlmxtend_api::{CapabilityId, ExtensionRequest};
 use lmlmxtend_core::RuntimeConfig;
-use lmlmxtend_processor_bridge::{HttpLmlmProcessor, ProcessorBridge};
+use lmlmxtend_processor_bridge::{HttpLmlmProcessor, LmlmProcessor, ProcessorBridge};
 use lmlmxtend_runtime::Runtime;
 use std::net::SocketAddr;
 use std::sync::Arc;

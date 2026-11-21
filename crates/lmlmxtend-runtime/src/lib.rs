@@ -1,8 +1,8 @@
 //! Minimal in-process extension host. This is not an isolation boundary.
 
 use lmlmxtend_api::{
-    CapabilityId, ExecutionContext, Extension, ExtensionError, ExtensionManifest, ExtensionRequest,
-    ExtensionResponse,
+    CapabilityId, ExecutionContext, Extension, ExtensionError, ExtensionId, ExtensionManifest,
+    ExtensionRequest, ExtensionResponse,
 };
 use lmlmxtend_core::{ExecutionPolicy, PolicyDecision, RuntimeConfig};
 use std::collections::{BTreeMap, BTreeSet};
@@ -81,10 +81,10 @@ impl Runtime {
     /// Registers an extension after validating its manifest and capability ownership.
     pub fn register(&mut self, extension: Arc<dyn Extension>) -> Result<(), RuntimeError> {
         let manifest: ExtensionManifest = extension.manifest();
-        if manifest.id.trim().is_empty() || manifest.version.trim().is_empty() {
-            return Err(RuntimeError::InvalidManifest(
-                "id and version are required".into(),
-            ));
+        ExtensionId::new(manifest.id.clone())
+            .map_err(|error| RuntimeError::InvalidManifest(error.to_string()))?;
+        if manifest.version.trim().is_empty() {
+            return Err(RuntimeError::InvalidManifest("version is required".into()));
         }
         if manifest.api_version != lmlmxtend_api::API_VERSION {
             return Err(RuntimeError::InvalidManifest(

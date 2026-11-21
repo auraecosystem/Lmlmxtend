@@ -1,13 +1,11 @@
+//! Typed, modality-aware boundary between LMLMxtend and the local LMLM processor.
+//!
+//! The crate provides an injectable processor trait, a local HTTP client for the
+//! versioned LMLM Processor v1 service, and an extension adapter for the runtime.
+
 mod http;
 
 pub use http::HttpLmlmProcessor;
-
-//! Typed boundary between LMLMxtend and an independently implemented LMLM processor.
-//!
-//! This crate deliberately does not implement inference or depend on a model runtime.
-//! A concrete LMLM backend implements `LmlmProcessor` and is injected by the host.
-//! The typed API carries arbitrary modality payloads; the generic Extension adapter
-//! currently exposes UTF-8 text requests through the existing string-based contract.
 
 use lmlmxtend_api::{
     CapabilityId, ExecutionContext, Extension, ExtensionError, ExtensionManifest, ExtensionRequest,

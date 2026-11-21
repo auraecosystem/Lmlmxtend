@@ -33,7 +33,7 @@ impl HttpLmlmProcessor {
         address: SocketAddr,
         timeout: Duration,
     ) -> Result<Self, ProcessorError> {
-        if !address.ip().is_loopback() {
+        if !address.is_ipv4() || !address.ip().is_loopback() {
             return Err(ProcessorError::InvalidInput(
                 "LMLM Processor v1 must use a loopback address".into(),
             ));

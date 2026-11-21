@@ -3,8 +3,7 @@
 use lmlmxtend_api::{CapabilityId, ExecutionContext, ExtensionRequest};
 use lmlmxtend_core::RuntimeConfig;
 use lmlmxtend_processor_bridge::{
-    LmlmProcessor, Modality, ProcessorBridge, ProcessorError, ProcessorRequest,
-    ProcessorResponse,
+    LmlmProcessor, Modality, ProcessorBridge, ProcessorError, ProcessorRequest, ProcessorResponse,
 };
 use lmlmxtend_runtime::Runtime;
 use std::sync::Arc;

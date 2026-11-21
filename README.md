@@ -19,6 +19,7 @@ The Rust workspace contains:
 - `lmlmxtend-api`: versioned extension and capability contracts.
 - `lmlmxtend-core`: runtime configuration, capability identifiers, and execution policy.
 - `lmlmxtend-runtime`: an in-process extension registry, read-only capability discovery, and policy-checked dispatcher.
+- `lmlmxtend-processor-bridge`: a typed, modality-aware boundary for injecting the independent LMLM processor, with a UTF-8 extension adapter and cooperative execution controls.
 - `lmlmxtend-intelligence`: deterministic capability-aware task planning and dispatch with API-version checks and explicit provider preferences.
 - `lmlmxtend-agent-runtime`: permission-aware agent registration, bounded delegation, deterministic DAG plans, bounded parallel execution, per-execution shared state and messaging, capability invocation, and lifecycle propagation.
 - `lmlmxtend-extension-forge`: a native CLI that scaffolds validated, standalone extension crates.
@@ -62,7 +63,7 @@ Scaffold an extension through the cross-platform wrapper:
 bash scripts/new-extension.sh --name scene-composer --category creative --capability creative.compose
 ```
 
-See [Developer scripts](scripts/README.md), [Architecture](docs/ARCHITECTURE.md), [Security](docs/SECURITY.md), [Extension Forge](docs/EXTENSION_FORGE.md), [Intelligence Routing](docs/INTELLIGENCE_ROUTING.md), [Agent Runtime](docs/AGENT_RUNTIME.md), and [Roadmap](docs/ROADMAP.md).
+See [Processor Bridge](docs/PROCESSOR_BRIDGE.md), [Developer scripts](scripts/README.md), [Architecture](docs/ARCHITECTURE.md), [Security](docs/SECURITY.md), [Extension Forge](docs/EXTENSION_FORGE.md), [Intelligence Routing](docs/INTELLIGENCE_ROUTING.md), [Agent Runtime](docs/AGENT_RUNTIME.md), and [Roadmap](docs/ROADMAP.md).
 
 ## Design principles
 

@@ -8,6 +8,7 @@ description = "Typed local processor boundary and LMLMxtend extension adapter"
 
 [dependencies]
 lmlmxtend-api = { path = "../lmlmxtend-api" }
+serde_json = "1"
 
 [dev-dependencies]
 lmlmxtend-core = { path = "../lmlmxtend-core" }

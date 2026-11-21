@@ -19,7 +19,7 @@ The Rust workspace contains:
 - `lmlmxtend-api`: versioned extension and capability contracts.
 - `lmlmxtend-core`: runtime configuration, capability identifiers, and execution policy.
 - `lmlmxtend-runtime`: an in-process extension registry, read-only capability discovery, and policy-checked dispatcher.
-- `lmlmxtend-processor-bridge`: a typed, modality-aware boundary for injecting the independent LMLM processor, with a UTF-8 extension adapter and cooperative execution controls.
+- `lmlmxtend-processor-bridge`: a typed, modality-aware boundary with a loopback-only HTTP client for the versioned LMLM Processor v1 service.
 - `lmlmxtend-intelligence`: deterministic capability-aware task planning and dispatch with API-version checks and explicit provider preferences.
 - `lmlmxtend-agent-runtime`: permission-aware agent registration, bounded delegation, deterministic DAG plans, bounded parallel execution, per-execution shared state and messaging, capability invocation, and lifecycle propagation.
 - `lmlmxtend-extension-forge`: a native CLI that scaffolds validated, standalone extension crates.

@@ -1,3 +1,7 @@
+mod http;
+
+pub use http::HttpLmlmProcessor;
+
 //! Typed boundary between LMLMxtend and an independently implemented LMLM processor.
 //!
 //! This crate deliberately does not implement inference or depend on a model runtime.

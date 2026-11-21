@@ -180,8 +180,7 @@ impl Extension for ProcessorBridge {
         if request.capability.as_str() != Self::CAPABILITY_ID {
             return Err(ExtensionError::UnsupportedOperation);
         }
-        let text = String::from_utf8(request.input.into_bytes())
-            .map_err(|error| ExtensionError::InvalidInput(error.to_string()))?;
+        let text = request.input;
         let mut processor_request = ProcessorRequest::text(text);
         processor_request.correlation_id = request.correlation_id;
         let response = self

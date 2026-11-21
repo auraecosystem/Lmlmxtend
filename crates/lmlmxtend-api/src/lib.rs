@@ -19,7 +19,10 @@ impl ExtensionId {
                 !part.is_empty()
                     && part.len() <= 48
                     && part.as_bytes()[0].is_ascii_lowercase()
-                    && part.as_bytes().last().is_some_and(|byte| byte.is_ascii_alphanumeric())
+                    && part
+                        .as_bytes()
+                        .last()
+                        .is_some_and(|byte| byte.is_ascii_alphanumeric())
                     && part.bytes().all(|byte| {
                         byte.is_ascii_lowercase()
                             || byte.is_ascii_digit()
@@ -27,10 +30,16 @@ impl ExtensionId {
                             || byte == b'_'
                     })
             });
-        if valid { Ok(Self(value)) } else { Err(ContractError::InvalidExtensionId) }
+        if valid {
+            Ok(Self(value))
+        } else {
+            Err(ContractError::InvalidExtensionId)
+        }
     }
 
-    pub fn as_str(&self) -> &str { &self.0 }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 impl fmt::Display for ExtensionId {
@@ -297,7 +306,12 @@ mod tests {
 
     #[test]
     fn validates_extension_ids() {
-        assert_eq!(ExtensionId::new("creative.scene-composer").unwrap().as_str(), "creative.scene-composer");
+        assert_eq!(
+            ExtensionId::new("creative.scene-composer")
+                .unwrap()
+                .as_str(),
+            "creative.scene-composer"
+        );
         assert!(ExtensionId::new("single").is_err());
         assert!(ExtensionId::new("Creative.scene").is_err());
         assert!(ExtensionId::new("creative..scene").is_err());

@@ -29,10 +29,7 @@ impl HttpLmlmProcessor {
     }
 
     /// Creates a local processor client with an explicit bounded timeout.
-    pub fn with_timeout(
-        address: SocketAddr,
-        timeout: Duration,
-    ) -> Result<Self, ProcessorError> {
+    pub fn with_timeout(address: SocketAddr, timeout: Duration) -> Result<Self, ProcessorError> {
         if !address.is_ipv4() || !address.ip().is_loopback() {
             return Err(ProcessorError::InvalidInput(
                 "LMLM Processor v1 must use a loopback address".into(),
@@ -46,7 +43,12 @@ impl HttpLmlmProcessor {
         Ok(Self { address, timeout })
     }
 
-    fn exchange(&self, method: &str, path: &str, body: &[u8]) -> Result<(u16, Vec<u8>), ProcessorError> {
+    fn exchange(
+        &self,
+        method: &str,
+        path: &str,
+        body: &[u8],
+    ) -> Result<(u16, Vec<u8>), ProcessorError> {
         let mut stream = TcpStream::connect_timeout(&self.address, self.timeout)
             .map_err(|error| ProcessorError::Unavailable(error.to_string()))?;
         stream
@@ -118,7 +120,10 @@ impl LmlmProcessor for HttpLmlmProcessor {
             .check_cancelled()
             .map_err(|error| ProcessorError::Failed(error.to_string()))?;
         let request_id = request.correlation_id.unwrap_or_else(|| {
-            format!("lmlmxtend-{}", NEXT_REQUEST_ID.fetch_add(1, Ordering::Relaxed))
+            format!(
+                "lmlmxtend-{}",
+                NEXT_REQUEST_ID.fetch_add(1, Ordering::Relaxed)
+            )
         });
         let modality = match request.modality {
             Modality::Text => "text",
@@ -183,7 +188,10 @@ impl LmlmProcessor for HttpLmlmProcessor {
                 "local processor output exceeds the configured output limit".into(),
             ));
         }
-        Ok(ProcessorResponse { payload, content_type })
+        Ok(ProcessorResponse {
+            payload,
+            content_type,
+        })
     }
 }
 
@@ -199,7 +207,9 @@ fn encode_hex(bytes: &[u8]) -> String {
 
 fn decode_hex(value: &str) -> Result<Vec<u8>, ProcessorError> {
     if value.len() % 2 != 0 {
-        return Err(ProcessorError::Failed("processor payload hex has odd length".into()));
+        return Err(ProcessorError::Failed(
+            "processor payload hex has odd length".into(),
+        ));
     }
     let mut output = Vec::with_capacity(value.len() / 2);
     for pair in value.as_bytes().chunks_exact(2) {
@@ -215,7 +225,9 @@ fn hex_digit(value: u8) -> Result<u8, ProcessorError> {
         b'0'..=b'9' => Ok(value - b'0'),
         b'a'..=b'f' => Ok(value - b'a' + 10),
         b'A'..=b'F' => Ok(value - b'A' + 10),
-        _ => Err(ProcessorError::Failed("processor payload contains invalid hex".into())),
+        _ => Err(ProcessorError::Failed(
+            "processor payload contains invalid hex".into(),
+        )),
     }
 }
 

@@ -1,0 +1,10 @@
+[package]
+name = "lmlmxtend-processor-bridge"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Typed local processor boundary and LMLMxtend extension adapter"
+
+[dependencies]
+lmlmxtend-api = { path = "../lmlmxtend-api" }

@@ -242,4 +242,37 @@ mod tests {
         let address = "127.0.0.1:8765".parse().unwrap();
         assert!(HttpLmlmProcessor::new(address).is_ok());
     }
+
+    #[test]
+    fn sends_versioned_request_to_loopback_service() {
+        use std::io::Read;
+        use std::net::TcpListener;
+        use std::thread;
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = [0_u8; 4096];
+            let _ = stream.read(&mut request).unwrap();
+            let body = r#"{"protocol":"lmlm.processor.v1","protocol_version":1,"request_id":"bridge-test-7","content_type":"text/plain; charset=utf-8","payload_hex":"4f4b"}"#;
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\\r\\nContent-Type: application/json\\r\\nContent-Length: {}\\r\\nConnection: close\\r\\n\\r\\n{}",
+                body.len(),
+                body
+            )
+            .unwrap();
+        });
+
+        let processor = HttpLmlmProcessor::new(address).unwrap();
+        let mut request = ProcessorRequest::text("hello");
+        request.correlation_id = Some("bridge-test-7".into());
+        let response = processor
+            .process(request, &ExecutionContext::default())
+            .unwrap();
+        assert_eq!(response.payload, b"OK");
+        assert_eq!(response.content_type, "text/plain; charset=utf-8");
+        server.join().unwrap();
+    }
 }

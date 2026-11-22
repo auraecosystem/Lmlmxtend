@@ -13,6 +13,9 @@ cargo run --example basic_agent -p lmlmxtend-agent-runtime
 echo "==> Extension Forge help"
 cargo run -p lmlmxtend-extension-forge -- help
 
+echo "==> File Intelligence extension tests"
+cargo test --manifest-path extensions/productivity/file-intelligence/Cargo.toml
+
 echo "==> Generate and compile a temporary extension"
 mkdir -p extensions
 TEMP_ROOT="$(mktemp -d extensions/.lmlmxtend-smoke.XXXXXX)"

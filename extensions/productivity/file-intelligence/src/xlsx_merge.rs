@@ -26,9 +26,7 @@ pub(super) fn merge_xlsx_files(
     let mut worksheet_count = 0usize;
 
     for (input_index, input) in inputs.iter().enumerate() {
-        context
-            .check_cancelled()
-            .map_err(super::execution_error)?;
+        context.check_cancelled().map_err(super::execution_error)?;
 
         let mut source: Xlsx<_> = open_workbook(input).map_err(super::execution_error)?;
         let sheet_names = source.sheet_names().to_owned();
@@ -46,9 +44,7 @@ pub(super) fn merge_xlsx_files(
             .unwrap_or("source");
 
         for source_sheet_name in sheet_names {
-            context
-                .check_cancelled()
-                .map_err(super::execution_error)?;
+            context.check_cancelled().map_err(super::execution_error)?;
 
             let range = source
                 .worksheet_range(&source_sheet_name)
@@ -66,9 +62,7 @@ pub(super) fn merge_xlsx_files(
 
             let (start_row, start_column) = range.start().unwrap_or((0, 0));
             for (row_offset, cells) in range.rows().enumerate() {
-                context
-                    .check_cancelled()
-                    .map_err(super::execution_error)?;
+                context.check_cancelled().map_err(super::execution_error)?;
                 let row = start_row
                     .checked_add(u32::try_from(row_offset).map_err(super::execution_error)?)
                     .ok_or_else(|| {

@@ -595,7 +595,6 @@ fn merge(
     })
 }
 
-
 fn write_new_output(path: &Path, bytes: &[u8]) -> Result<(), ExtensionError> {
     let mut file = OpenOptions::new()
         .write(true)
@@ -641,15 +640,12 @@ fn merge_pdf_files(
         }
     }
 
-    fn materialize_page(
-        document: &PdfDocument,
-        page_id: ObjectId,
-    ) -> Result<Dictionary, PdfError> {
+    fn materialize_page(document: &PdfDocument, page_id: ObjectId) -> Result<Dictionary, PdfError> {
         let mut page = document.get_dictionary(page_id)?.clone();
         let media_box = inherited_attribute(document, page_id, b"MediaBox")?
             .ok_or_else(|| PdfError::DictKey("MediaBox".to_owned()))?;
-        let crop_box =
-            inherited_attribute(document, page_id, b"CropBox")?.unwrap_or_else(|| media_box.clone());
+        let crop_box = inherited_attribute(document, page_id, b"CropBox")?
+            .unwrap_or_else(|| media_box.clone());
         let resources = inherited_attribute(document, page_id, b"Resources")?
             .unwrap_or_else(|| Object::Dictionary(Dictionary::new()));
         let rotation =
@@ -721,7 +717,10 @@ fn merge_pdf_files(
 
         for page_id in source.get_pages().values() {
             page_order.push(*page_id);
-            let page = source.get_object(*page_id).map_err(execution_error)?.clone();
+            let page = source
+                .get_object(*page_id)
+                .map_err(execution_error)?
+                .clone();
             page_objects.insert(*page_id, page);
         }
 
@@ -736,16 +735,15 @@ fn merge_pdf_files(
     }
 
     merged.objects.extend(page_objects);
-    let (catalog_id, mut catalog) = first_catalog
-        .ok_or_else(|| ExtensionError::InvalidInput("no PDF catalog found".into()))?;
-    let (pages_id, mut pages) = first_pages
-        .ok_or_else(|| ExtensionError::InvalidInput("no PDF page tree found".into()))?;
+    let (catalog_id, mut catalog) =
+        first_catalog.ok_or_else(|| ExtensionError::InvalidInput("no PDF catalog found".into()))?;
+    let (pages_id, mut pages) =
+        first_pages.ok_or_else(|| ExtensionError::InvalidInput("no PDF page tree found".into()))?;
 
     for page_id in &page_order {
-        let page = merged
-            .objects
-            .get_mut(page_id)
-            .ok_or_else(|| ExtensionError::ExecutionFailed("merged PDF page object is missing".into()))?;
+        let page = merged.objects.get_mut(page_id).ok_or_else(|| {
+            ExtensionError::ExecutionFailed("merged PDF page object is missing".into())
+        })?;
         let dictionary = page.as_dict_mut().map_err(execution_error)?;
         dictionary.set("Parent", Object::Reference(pages_id));
     }
@@ -757,14 +755,20 @@ fn merge_pdf_files(
     pages.set("Count", page_order.len() as u32);
     pages.set(
         "Kids",
-        page_order.iter().copied().map(Object::Reference).collect::<Vec<_>>(),
+        page_order
+            .iter()
+            .copied()
+            .map(Object::Reference)
+            .collect::<Vec<_>>(),
     );
 
     catalog.set("Pages", Object::Reference(pages_id));
     catalog.remove(b"Outlines");
 
     merged.objects.insert(pages_id, Object::Dictionary(pages));
-    merged.objects.insert(catalog_id, Object::Dictionary(catalog));
+    merged
+        .objects
+        .insert(catalog_id, Object::Dictionary(catalog));
     merged.trailer.set("Root", Object::Reference(catalog_id));
     merged.max_id = merged.objects.keys().map(|(id, _)| *id).max().unwrap_or(0);
 

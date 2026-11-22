@@ -9,7 +9,7 @@ use rust_xlsxwriter::Workbook;
 use std::{
     collections::HashSet,
     convert::TryFrom,
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
 const MAX_ROWS: u32 = 1_048_576;
@@ -101,26 +101,38 @@ pub(super) fn merge_xlsx_files(
                         {
                             worksheet
                                 .write_number(row, column, *value as f64)
-                                .map_err(super::execution_error)?
+                                .map_err(super::execution_error)?;
                         }
-                        Data::Int(value) => worksheet
-                            .write_string(row, column, value.to_string())
-                            .map_err(super::execution_error)?,
-                        Data::Float(value) if value.is_finite() => worksheet
-                            .write_number(row, column, *value)
-                            .map_err(super::execution_error)?,
-                        Data::Float(value) => worksheet
-                            .write_string(row, column, value.to_string())
-                            .map_err(super::execution_error)?,
-                        Data::String(value) => worksheet
-                            .write_string(row, column, value)
-                            .map_err(super::execution_error)?,
-                        Data::Bool(value) => worksheet
-                            .write_boolean(row, column, *value)
-                            .map_err(super::execution_error)?,
-                        other => worksheet
-                            .write_string(row, column, other.to_string())
-                            .map_err(super::execution_error)?,
+                        Data::Int(value) => {
+                            worksheet
+                                .write_string(row, column, value.to_string())
+                                .map_err(super::execution_error)?;
+                        }
+                        Data::Float(value) if value.is_finite() => {
+                            worksheet
+                                .write_number(row, column, *value)
+                                .map_err(super::execution_error)?;
+                        }
+                        Data::Float(value) => {
+                            worksheet
+                                .write_string(row, column, value.to_string())
+                                .map_err(super::execution_error)?;
+                        }
+                        Data::String(value) => {
+                            worksheet
+                                .write_string(row, column, value)
+                                .map_err(super::execution_error)?;
+                        }
+                        Data::Bool(value) => {
+                            worksheet
+                                .write_boolean(row, column, *value)
+                                .map_err(super::execution_error)?;
+                        }
+                        other => {
+                            worksheet
+                                .write_string(row, column, other.to_string())
+                                .map_err(super::execution_error)?;
+                        }
                     }
                 }
             }

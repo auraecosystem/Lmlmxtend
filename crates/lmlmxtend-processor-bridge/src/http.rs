@@ -1,6 +1,9 @@
 //! HTTP transport for the versioned, loopback-only LMLM Processor v1 service.
 
-use crate::{GenerationParameters, LmlmProcessor, Modality, ProcessorError, ProcessorRequest, ProcessorResponse};
+use crate::{
+    GenerationParameters, LmlmProcessor, Modality, ProcessorError, ProcessorRequest,
+    ProcessorResponse,
+};
 use lmlmxtend_api::ExecutionContext;
 use serde_json::{json, Value};
 use std::io::{Read, Write};
@@ -311,8 +314,14 @@ mod tests {
             assert_eq!(request.len(), expected_length);
             let envelope: Value = serde_json::from_slice(&request[header_end + 4..]).unwrap();
             let parameters = envelope.get("parameters").unwrap();
-            assert_eq!(parameters.get("max_tokens").and_then(Value::as_u64), Some(77));
-            assert_eq!(parameters.get("temperature").and_then(Value::as_f64), Some(0.25));
+            assert_eq!(
+                parameters.get("max_tokens").and_then(Value::as_u64),
+                Some(77)
+            );
+            assert_eq!(
+                parameters.get("temperature").and_then(Value::as_f64),
+                Some(0.25)
+            );
             let body = r#"{"protocol":"lmlm.processor.v1","protocol_version":1,"request_id":"bridge-test-7","content_type":"text/plain; charset=utf-8","payload_hex":"4f4b"}"#;
             write!(
                 stream,

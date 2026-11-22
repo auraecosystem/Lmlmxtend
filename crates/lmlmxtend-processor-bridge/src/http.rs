@@ -1,6 +1,6 @@
 //! HTTP transport for the versioned, loopback-only LMLM Processor v1 service.
 
-use crate::{LmlmProcessor, Modality, ProcessorError, ProcessorRequest, ProcessorResponse};
+use crate::{GenerationParameters, LmlmProcessor, Modality, ProcessorError, ProcessorRequest, ProcessorResponse};
 use lmlmxtend_api::ExecutionContext;
 use serde_json::{json, Value};
 use std::io::{Read, Write};
@@ -116,9 +116,19 @@ impl LmlmProcessor for HttpLmlmProcessor {
         request: ProcessorRequest,
         context: &ExecutionContext,
     ) -> Result<ProcessorResponse, ProcessorError> {
+        self.process_with_parameters(request, &GenerationParameters::default(), context)
+    }
+
+    fn process_with_parameters(
+        &self,
+        request: ProcessorRequest,
+        parameters: &GenerationParameters,
+        context: &ExecutionContext,
+    ) -> Result<ProcessorResponse, ProcessorError> {
         context
             .check_cancelled()
             .map_err(|error| ProcessorError::Failed(error.to_string()))?;
+        parameters.validate()?;
         let request_id = request.correlation_id.unwrap_or_else(|| {
             format!(
                 "lmlmxtend-{}",
@@ -132,6 +142,13 @@ impl LmlmProcessor for HttpLmlmProcessor {
             Modality::Video => "video",
             Modality::Multimodal => "multimodal",
         };
+        let mut wire_parameters = serde_json::Map::new();
+        if let Some(max_tokens) = parameters.max_tokens {
+            wire_parameters.insert("max_tokens".into(), json!(max_tokens));
+        }
+        if let Some(temperature) = parameters.temperature {
+            wire_parameters.insert("temperature".into(), json!(temperature));
+        }
         let body = json!({
             "protocol": PROTOCOL,
             "protocol_version": PROTOCOL_VERSION,
@@ -140,7 +157,7 @@ impl LmlmProcessor for HttpLmlmProcessor {
             "content_type": request.content_type,
             "payload_hex": encode_hex(&request.payload),
             "prompt": request.prompt,
-            "parameters": {},
+            "parameters": wire_parameters,
         })
         .to_string();
         let (status, response_body) = self.exchange("POST", "/v1/process", body.as_bytes())?;

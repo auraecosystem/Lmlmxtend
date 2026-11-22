@@ -1,4 +1,4 @@
-Perfect! Now we’re moving into the final layer: giving LMLM a visual/AR presence, so it feels like it’s “with you” in your space. Think of it as your AI buddy that not only talks and listens but also “shows up” visually.
+> Perfect! Now we’re moving into the final layer: giving LMLM a visual/AR presence, so it feels like it’s “with you” in your space. Think of it as your AI buddy that not only talks and listens but also “shows up” visually.
 
 ⸻
  
@@ -18,7 +18,7 @@ This makes LMLM feel like it’s alive, not just a voice assistant.
 ⸻
 
 2. Simple Desktop Avatar (Python + Tkinter)
-
+```python 
 import tkinter as tk
 from tts import speak
 
@@ -42,8 +42,9 @@ class LMLMAvatar:
 
     def run(self):
         self.root.mainloop()
-
+```
 # Example usage
+```python
 avatar = LMLMAvatar("Seriki")
 avatar.call_user()
 avatar.run()
@@ -51,11 +52,11 @@ avatar.run()
 	•	A small window pops up as your digital buddy
 	•	Text + emoji shows LMLM’s “mood”
 	•	Can be extended with animated GIFs or sprite avatars
-
+```
 ⸻
 
 3. Mood-Based Avatar Updates
-
+```python 
 def update_avatar_mood(avatar, mood="neutral"):
     if mood == "happy":
         avatar.update_status("😄 LMLM is cheerful!")
@@ -66,7 +67,7 @@ def update_avatar_mood(avatar, mood="neutral"):
 
 	•	Avatar reacts dynamically based on voice-detected mood
 	•	Reinforces presence and emotional awareness
-
+```
 ⸻
 
 4. AR / Mobile Layer (Optional)
@@ -99,7 +100,7 @@ Example:
 	•	Predictive nudges: Tasks, abandoned projects, trending news
 	•	Mood-aware interaction: Adjust tone and avatar expressions
 	•	Visual/AR presence: Avatar, shadow, gestures
-	•	Self-learning: Conversation logs improve understanding
+	•	Self-learning: Conversation logs improve understanding. 
 	•	24/7 Companion: Always ready, proactive, personalized
 
 ⸻

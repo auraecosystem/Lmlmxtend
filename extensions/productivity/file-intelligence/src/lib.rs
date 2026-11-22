@@ -11,14 +11,15 @@ use lmlmxtend_api::{
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     fs::{self, File, OpenOptions},
-    io::{BufRead, BufReader, BufWriter, Read, Write},
+    io::{BufRead, BufReader, BufWriter, Cursor, Read, Write},
     path::{Path, PathBuf},
 };
 
 const MAX_INPUT_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_MERGE_BYTES: u64 = 32 * 1024 * 1024;
+const MAX_DOCUMENT_MERGE_BYTES: u64 = 128 * 1024 * 1024;
 const HASH_LIMIT_BYTES: u64 = 512 * 1024 * 1024;
 const SKIP_DIRS: &[&str] = &[
     ".git",
@@ -508,9 +509,11 @@ fn merge(
             ));
         }
         let extension = extension_of(&canonical);
-        if !TEXT_EXTENSIONS.contains(&extension.as_str()) {
+        if !TEXT_EXTENSIONS.contains(&extension.as_str())
+            && !matches!(extension.as_str(), "pdf" | "docx")
+        {
             return Err(ExtensionError::InvalidInput(format!(
-                "unsupported text merge type: .{extension}"
+                "unsupported merge type: .{extension}; supported formats are text, PDF, and DOCX"
             )));
         }
         if expected_extension.as_ref().is_some_and(|v| v != &extension) {
@@ -518,12 +521,18 @@ fn merge(
                 "all merge inputs must have the same file extension".into(),
             ));
         }
-        expected_extension = Some(extension);
+        expected_extension = Some(extension.clone());
         total_input_bytes = total_input_bytes.saturating_add(metadata.len());
-        if total_input_bytes > MAX_MERGE_BYTES {
-            return Err(ExtensionError::InvalidInput(
-                "combined merge input exceeds 32 MiB".into(),
-            ));
+        let size_limit = if matches!(extension.as_str(), "pdf" | "docx") {
+            MAX_DOCUMENT_MERGE_BYTES
+        } else {
+            MAX_MERGE_BYTES
+        };
+        if total_input_bytes > size_limit {
+            return Err(ExtensionError::InvalidInput(format!(
+                "combined merge input exceeds {} MiB",
+                size_limit / (1024 * 1024)
+            )));
         }
         canonical_inputs.push(canonical);
     }
@@ -532,6 +541,12 @@ fn merge(
             "refusing to overwrite existing output: {}",
             output.display()
         )));
+    }
+
+    match expected_extension.as_deref() {
+        Some("pdf") => return merge_pdf_files(canonical_inputs, output, context),
+        Some("docx") => return merge_docx_files(canonical_inputs, output, context),
+        _ => {}
     }
 
     let file = OpenOptions::new()
@@ -577,6 +592,300 @@ fn merge(
             .map(|p| p.display().to_string())
             .collect(),
         bytes_written,
+    })
+}
+
+fn write_new_output(path: &Path, bytes: &[u8]) -> Result<(), ExtensionError> {
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .map_err(execution_error)?;
+    file.write_all(bytes).map_err(execution_error)?;
+    file.flush().map_err(execution_error)?;
+    file.sync_all().map_err(execution_error)?;
+    Ok(())
+}
+
+fn merge_pdf_files(
+    inputs: Vec<PathBuf>,
+    output: PathBuf,
+    context: &ExecutionContext,
+) -> Result<MergeReport, ExtensionError> {
+    use lopdf::{Dictionary, Document as PdfDocument, Error as PdfError, Object, ObjectId};
+
+    fn inherited_attribute(
+        document: &PdfDocument,
+        page_id: ObjectId,
+        key: &[u8],
+    ) -> Result<Option<Object>, PdfError> {
+        let mut current = page_id;
+        let mut visited = HashSet::new();
+        loop {
+            if !visited.insert(current) {
+                return Err(PdfError::ReferenceCycle(current));
+            }
+            let node = document.get_dictionary(current)?;
+            if let Ok(value) = node.get(key) {
+                match document.dereference(value) {
+                    Ok((_, Object::Null)) | Err(PdfError::ObjectNotFound(_)) => {}
+                    Ok(_) => return Ok(Some(value.clone())),
+                    Err(error) => return Err(error),
+                }
+            }
+            match node.get(b"Parent") {
+                Err(_) | Ok(Object::Null) => return Ok(None),
+                Ok(parent) => current = parent.as_reference()?,
+            }
+        }
+    }
+
+    fn materialize_page(document: &PdfDocument, page_id: ObjectId) -> Result<Dictionary, PdfError> {
+        let mut page = document.get_dictionary(page_id)?.clone();
+        let media_box = inherited_attribute(document, page_id, b"MediaBox")?
+            .ok_or_else(|| PdfError::DictKey("MediaBox".to_owned()))?;
+        let crop_box = inherited_attribute(document, page_id, b"CropBox")?
+            .unwrap_or_else(|| media_box.clone());
+        let resources = inherited_attribute(document, page_id, b"Resources")?
+            .unwrap_or_else(|| Object::Dictionary(Dictionary::new()));
+        let rotation =
+            inherited_attribute(document, page_id, b"Rotate")?.unwrap_or(Object::Integer(0));
+        page.set("MediaBox", media_box);
+        page.set("CropBox", crop_box);
+        page.set("Resources", resources);
+        page.set("Rotate", rotation);
+        Ok(page)
+    }
+
+    let mut merged = PdfDocument::with_version("1.5");
+    let mut next_object_id = 1u32;
+    let mut page_order: Vec<ObjectId> = Vec::new();
+    let mut page_objects = BTreeMap::new();
+    let mut first_catalog: Option<(ObjectId, Dictionary)> = None;
+    let mut first_pages: Option<(ObjectId, Dictionary)> = None;
+
+    for input in &inputs {
+        context.check_cancelled().map_err(execution_error)?;
+        let mut source = PdfDocument::load(input).map_err(execution_error)?;
+        if source.is_encrypted() {
+            return Err(ExtensionError::InvalidInput(format!(
+                "encrypted PDFs are not supported: {}",
+                input.display()
+            )));
+        }
+
+        let original_pages = source.get_pages();
+        if original_pages.is_empty() {
+            return Err(ExtensionError::InvalidInput(format!(
+                "PDF contains no pages: {}",
+                input.display()
+            )));
+        }
+
+        for page_id in original_pages.values() {
+            let page = materialize_page(&source, *page_id).map_err(execution_error)?;
+            source.objects.insert(*page_id, Object::Dictionary(page));
+        }
+
+        source.renumber_objects_with(next_object_id);
+        next_object_id = source.max_id.saturating_add(1);
+
+        let catalog_id = source
+            .trailer
+            .get(b"Root")
+            .map_err(execution_error)?
+            .as_reference()
+            .map_err(execution_error)?;
+        let catalog = source
+            .get_dictionary(catalog_id)
+            .map_err(execution_error)?
+            .clone();
+        let pages_id = catalog
+            .get(b"Pages")
+            .map_err(execution_error)?
+            .as_reference()
+            .map_err(execution_error)?;
+        let pages = source
+            .get_dictionary(pages_id)
+            .map_err(execution_error)?
+            .clone();
+
+        if first_catalog.is_none() {
+            first_catalog = Some((catalog_id, catalog));
+            first_pages = Some((pages_id, pages));
+        }
+
+        for page_id in source.get_pages().values() {
+            page_order.push(*page_id);
+            let page = source
+                .get_object(*page_id)
+                .map_err(execution_error)?
+                .clone();
+            page_objects.insert(*page_id, page);
+        }
+
+        for (object_id, object) in source.objects {
+            match object.type_name().unwrap_or(b"") {
+                b"Catalog" | b"Pages" | b"Page" | b"Outlines" | b"Outline" => {}
+                _ => {
+                    merged.objects.insert(object_id, object);
+                }
+            }
+        }
+    }
+
+    merged.objects.extend(page_objects);
+    let (catalog_id, mut catalog) =
+        first_catalog.ok_or_else(|| ExtensionError::InvalidInput("no PDF catalog found".into()))?;
+    let (pages_id, mut pages) =
+        first_pages.ok_or_else(|| ExtensionError::InvalidInput("no PDF page tree found".into()))?;
+
+    for page_id in &page_order {
+        let page = merged.objects.get_mut(page_id).ok_or_else(|| {
+            ExtensionError::ExecutionFailed("merged PDF page object is missing".into())
+        })?;
+        let dictionary = page.as_dict_mut().map_err(execution_error)?;
+        dictionary.set("Parent", Object::Reference(pages_id));
+    }
+
+    pages.remove(b"Parent");
+    for key in [b"MediaBox".as_slice(), b"CropBox", b"Resources", b"Rotate"] {
+        pages.remove(key);
+    }
+    pages.set("Count", page_order.len() as u32);
+    pages.set(
+        "Kids",
+        page_order
+            .iter()
+            .copied()
+            .map(Object::Reference)
+            .collect::<Vec<_>>(),
+    );
+
+    catalog.set("Pages", Object::Reference(pages_id));
+    catalog.remove(b"Outlines");
+
+    merged.objects.insert(pages_id, Object::Dictionary(pages));
+    merged
+        .objects
+        .insert(catalog_id, Object::Dictionary(catalog));
+    merged.trailer.set("Root", Object::Reference(catalog_id));
+    merged.max_id = merged.objects.keys().map(|(id, _)| *id).max().unwrap_or(0);
+
+    let mut bytes = Vec::new();
+    merged.save_to(&mut bytes).map_err(execution_error)?;
+    write_new_output(&output, &bytes)?;
+
+    Ok(MergeReport {
+        output: output.display().to_string(),
+        inputs: inputs.iter().map(|p| p.display().to_string()).collect(),
+        bytes_written: bytes.len() as u64,
+    })
+}
+
+fn merge_docx_files(
+    inputs: Vec<PathBuf>,
+    output: PathBuf,
+    context: &ExecutionContext,
+) -> Result<MergeReport, ExtensionError> {
+    use docx_rs::{read_docx, DocumentChild, Docx, Paragraph, Run};
+
+    fn validate_appended_docx(document: &Docx, path: &Path) -> Result<(), ExtensionError> {
+        let relationships = &document.document_rels;
+        let has_external_parts = relationships.has_comments
+            || relationships.has_numberings
+            || relationships.has_footnotes
+            || relationships.header_count > 0
+            || relationships.footer_count > 0
+            || relationships.custom_xml_count > 0
+            || !relationships.images.is_empty()
+            || !relationships.hyperlinks.is_empty()
+            || !document.media.is_empty()
+            || !document.images.is_empty()
+            || !document.hyperlinks.is_empty();
+
+        if has_external_parts {
+            return Err(ExtensionError::InvalidInput(format!(
+                "DOCX input '{}' contains media, links, numbering, comments, footnotes, headers, footers, or other linked parts; only self-contained body content can be appended in this version",
+                path.display()
+            )));
+        }
+
+        if document
+            .document
+            .children
+            .iter()
+            .any(|child| !matches!(child, DocumentChild::Paragraph(_) | DocumentChild::Table(_)))
+        {
+            return Err(ExtensionError::InvalidInput(format!(
+                "DOCX input '{}' contains body elements that require cross-document relationship remapping",
+                path.display()
+            )));
+        }
+        Ok(())
+    }
+
+    let mut merged: Option<Docx> = None;
+    for (index, input) in inputs.iter().enumerate() {
+        context.check_cancelled().map_err(execution_error)?;
+        let bytes = fs::read(input).map_err(execution_error)?;
+        let mut current = read_docx(&bytes).map_err(execution_error)?;
+
+        if index == 0 {
+            merged = Some(current);
+            continue;
+        }
+
+        validate_appended_docx(&current, input)?;
+        let base = merged.as_mut().expect("first DOCX was loaded");
+
+        for style in current.styles.styles.drain(..) {
+            if let Some(existing) = base
+                .styles
+                .styles
+                .iter()
+                .find(|item| item.style_id == style.style_id)
+            {
+                if existing != &style {
+                    return Err(ExtensionError::InvalidInput(format!(
+                        "DOCX style '{}' conflicts between source documents",
+                        style.style_id
+                    )));
+                }
+            } else {
+                base.styles.styles.push(style);
+            }
+        }
+
+        let source_name = input
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("document");
+        base.document
+            .children
+            .push(DocumentChild::Paragraph(Box::new(
+                Paragraph::new().add_run(Run::new().add_text(format!(
+                    "— Source document {}: {} —",
+                    index + 1,
+                    source_name
+                ))),
+            )));
+        base.document
+            .children
+            .append(&mut current.document.children);
+    }
+
+    let merged =
+        merged.ok_or_else(|| ExtensionError::InvalidInput("no DOCX inputs supplied".into()))?;
+    let mut cursor = Cursor::new(Vec::new());
+    merged.pack(&mut cursor).map_err(execution_error)?;
+    let bytes = cursor.into_inner();
+    write_new_output(&output, &bytes)?;
+
+    Ok(MergeReport {
+        output: output.display().to_string(),
+        inputs: inputs.iter().map(|p| p.display().to_string()).collect(),
+        bytes_written: bytes.len() as u64,
     })
 }
 
@@ -723,5 +1032,87 @@ mod tests {
         fs::write(&a, "a").unwrap();
         fs::write(&b, "b").unwrap();
         assert!(merge(vec![a, b.clone()], b, &ExecutionContext::default()).is_err());
+    }
+
+    fn minimal_test_pdf() -> Vec<u8> {
+        use lopdf::{dictionary, Dictionary, Document as PdfDocument, Object, Stream};
+
+        let mut document = PdfDocument::with_version("1.5");
+        let pages_id = document.new_object_id();
+        let content_id = document.add_object(Stream::new(Dictionary::new(), Vec::new()));
+        let page_id = document.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "Contents" => content_id,
+            "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()],
+        });
+        document.objects.insert(
+            pages_id,
+            Object::Dictionary(lopdf::dictionary! {
+                "Type" => "Pages",
+                "Kids" => vec![page_id.into()],
+                "Count" => 1,
+            }),
+        );
+        let catalog_id = document.add_object(lopdf::dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        document.trailer.set("Root", catalog_id);
+        let mut bytes = Vec::new();
+        document.save_to(&mut bytes).unwrap();
+        bytes
+    }
+
+    #[test]
+    fn pdf_merge_combines_page_trees_and_preserves_source_files() {
+        let dir = tempdir().unwrap();
+        let first = dir.path().join("first.pdf");
+        let second = dir.path().join("second.pdf");
+        let output = dir.path().join("combined.pdf");
+        fs::write(&first, minimal_test_pdf()).unwrap();
+        fs::write(&second, minimal_test_pdf()).unwrap();
+
+        merge(
+            vec![first.clone(), second.clone()],
+            output.clone(),
+            &ExecutionContext::default(),
+        )
+        .unwrap();
+
+        let merged = lopdf::Document::load(output).unwrap();
+        assert_eq!(merged.get_pages().len(), 2);
+        assert!(first.exists() && second.exists());
+    }
+
+    fn write_test_docx(path: &Path, text: &str) {
+        let document = docx_rs::Document::new()
+            .add_paragraph(docx_rs::Paragraph::new().add_run(docx_rs::Run::new().add_text(text)));
+        docx_rs::Docx::new()
+            .document(document)
+            .pack(File::create(path).unwrap())
+            .unwrap();
+    }
+
+    #[test]
+    fn docx_merge_appends_body_content_and_preserves_inputs() {
+        let dir = tempdir().unwrap();
+        let first = dir.path().join("first.docx");
+        let second = dir.path().join("second.docx");
+        let output = dir.path().join("combined.docx");
+        write_test_docx(&first, "first document");
+        write_test_docx(&second, "second document");
+
+        merge(
+            vec![first.clone(), second.clone()],
+            output.clone(),
+            &ExecutionContext::default(),
+        )
+        .unwrap();
+
+        let bytes = fs::read(output).unwrap();
+        let merged = docx_rs::read_docx(&bytes).unwrap();
+        assert_eq!(merged.document.children.len(), 3);
+        assert!(first.exists() && second.exists());
     }
 }

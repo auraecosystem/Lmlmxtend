@@ -593,11 +593,11 @@ mod tests {
         });
         ExtensionRequest::new(
             CapabilityId::new(if operation == "arrange" {
-            "files.organize".to_owned()
-        } else {
-            format!("files.{operation}")
-        })
-        .unwrap(),
+                "files.organize".to_owned()
+            } else {
+                format!("files.{operation}")
+            })
+            .unwrap(),
             payload.to_string(),
         )
     }

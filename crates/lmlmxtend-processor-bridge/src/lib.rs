@@ -332,6 +332,25 @@ mod tests {
     }
 
     #[test]
+    fn unsupported_processor_rejects_non_empty_generation_parameters() {
+        let bridge = bridge();
+        let error = bridge
+            .process_with_parameters(
+                ProcessorRequest::text("hello"),
+                &GenerationParameters {
+                    max_tokens: Some(32),
+                    temperature: None,
+                },
+                &ExecutionContext::default(),
+            )
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            ProcessorBridgeError::Processor(ProcessorError::InvalidInput(_))
+        ));
+    }
+
+    #[test]
     fn cancelled_request_never_reaches_processor() {
         let bridge = bridge();
         let token = CancellationToken::new();

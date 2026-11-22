@@ -521,7 +521,7 @@ fn merge(
                 "all merge inputs must have the same file extension".into(),
             ));
         }
-        expected_extension = Some(extension);
+        expected_extension = Some(extension.clone());
         total_input_bytes = total_input_bytes.saturating_add(metadata.len());
         let size_limit = if matches!(extension.as_str(), "pdf" | "docx") {
             MAX_DOCUMENT_MERGE_BYTES
@@ -1035,12 +1035,12 @@ mod tests {
     }
 
     fn minimal_test_pdf() -> Vec<u8> {
-        use lopdf::{Dictionary, Document as PdfDocument, Object, Stream};
+        use lopdf::{dictionary, Dictionary, Document as PdfDocument, Object, Stream};
 
         let mut document = PdfDocument::with_version("1.5");
         let pages_id = document.new_object_id();
         let content_id = document.add_object(Stream::new(Dictionary::new(), Vec::new()));
-        let page_id = document.add_object(lopdf::dictionary! {
+        let page_id = document.add_object(dictionary! {
             "Type" => "Page",
             "Parent" => pages_id,
             "Contents" => content_id,

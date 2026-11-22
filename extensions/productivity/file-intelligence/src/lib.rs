@@ -499,7 +499,8 @@ fn merge(
         context.check_cancelled().map_err(execution_error)?;
         let metadata = fs::symlink_metadata(input).map_err(execution_error)?;
         if !metadata.is_file() || metadata.file_type().is_symlink() {
-            return Err(ExtensionError::InvalidInput(format!(                "merge input must be a regular, non-symlink file: {}",
+            return Err(ExtensionError::InvalidInput(format!(
+                "merge input must be a regular, non-symlink file: {}",
                 input.display()
             )));
         }
@@ -999,7 +1000,8 @@ mod tests {
         let dir = tempdir().unwrap();
         let file = dir.path().join("notes.txt");
         fs::write(&file, "notes").unwrap();
-        let report =            organize(dir.path().to_path_buf(), true, &ExecutionContext::default()).unwrap();
+        let report =
+            organize(dir.path().to_path_buf(), true, &ExecutionContext::default()).unwrap();
         assert!(!report.dry_run);
         assert!(!file.exists());
         assert!(dir.path().join("Text/notes.txt").exists());

@@ -5,7 +5,7 @@ A local-first Rust extension for studying directories, organizing loose files, a
 ## Capabilities
 
 - `files.study` — recursively inventories a directory, classifies files, records size and modification time, and finds duplicate-content candidates with SHA-256.
-- `files.organize` — previews category moves by default. A confirmed local-folder run moves only direct child regular files. A directory inside a Git repository is always report-only.
+- `files.organize` — previews category moves by default. A confirmed local-folder run moves only direct child regular files. A directory inside a Git repository is always report-only. The JSON operation may be `organize` or its `arrange` alias.
 - `files.merge` — merges two or more supported UTF-8 text files of one extension into a new output file. It never overwrites an existing file or modifies inputs.
 
 ## Request protocol

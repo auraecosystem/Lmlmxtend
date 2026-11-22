@@ -1,7 +1,7 @@
 //! Local-first file intelligence for LMLMxtend.
 //!
 //! The extension studies directories, proposes or performs conservative local
-//! organization, and merges supported UTF-8 text files. Repository organization
+//! organization, and merges supported text, PDF, DOCX, and XLSX files. Repository organization
 //! is always report-only. This is trusted in-process code, not an OS sandbox.
 
 use lmlmxtend_api::{
@@ -16,6 +16,8 @@ use std::{
     io::{BufRead, BufReader, BufWriter, Cursor, Read, Write},
     path::{Path, PathBuf},
 };
+
+mod xlsx_merge;
 
 const MAX_INPUT_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_MERGE_BYTES: u64 = 32 * 1024 * 1024;
@@ -510,10 +512,10 @@ fn merge(
         }
         let extension = extension_of(&canonical);
         if !TEXT_EXTENSIONS.contains(&extension.as_str())
-            && !matches!(extension.as_str(), "pdf" | "docx")
+            && !matches!(extension.as_str(), "pdf" | "docx" | "xlsx")
         {
             return Err(ExtensionError::InvalidInput(format!(
-                "unsupported merge type: .{extension}; supported formats are text, PDF, and DOCX"
+                "unsupported merge type: .{extension}; supported formats are text, PDF, DOCX, and XLSX"
             )));
         }
         if expected_extension.as_ref().is_some_and(|v| v != &extension) {
@@ -523,7 +525,7 @@ fn merge(
         }
         expected_extension = Some(extension.clone());
         total_input_bytes = total_input_bytes.saturating_add(metadata.len());
-        let size_limit = if matches!(extension.as_str(), "pdf" | "docx") {
+        let size_limit = if matches!(extension.as_str(), "pdf" | "docx" | "xlsx") {
             MAX_DOCUMENT_MERGE_BYTES
         } else {
             MAX_MERGE_BYTES
@@ -546,6 +548,7 @@ fn merge(
     match expected_extension.as_deref() {
         Some("pdf") => return merge_pdf_files(canonical_inputs, output, context),
         Some("docx") => return merge_docx_files(canonical_inputs, output, context),
+        Some("xlsx") => return xlsx_merge::merge_xlsx_files(canonical_inputs, output, context),
         _ => {}
     }
 

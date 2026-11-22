@@ -265,8 +265,33 @@ mod tests {
         let address = listener.local_addr().unwrap();
         let server = thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
-            let mut request = [0_u8; 4096];
-            let _ = stream.read(&mut request).unwrap();
+            let mut request = Vec::new();
+            let mut buffer = [0_u8; 1024];
+            let header_end = loop {
+                let count = stream.read(&mut buffer).unwrap();
+                assert!(count > 0, "client closed before sending HTTP headers");
+                request.extend_from_slice(&buffer[..count]);
+                if let Some(position) = request.windows(4).position(|part| part == b"\r\n\r\n") {
+                    break position;
+                }
+            };
+            let headers = std::str::from_utf8(&request[..header_end]).unwrap();
+            let content_length = headers
+                .lines()
+                .find_map(|line| {
+                    let (name, value) = line.split_once(':')?;
+                    name.eq_ignore_ascii_case("content-length")
+                        .then(|| value.trim().parse::<usize>().ok())
+                        .flatten()
+                })
+                .expect("request must include Content-Length");
+            let expected_length = header_end + 4 + content_length;
+            while request.len() < expected_length {
+                let count = stream.read(&mut buffer).unwrap();
+                assert!(count > 0, "client closed before sending the HTTP body");
+                request.extend_from_slice(&buffer[..count]);
+            }
+            assert_eq!(request.len(), expected_length);
             let body = r#"{"protocol":"lmlm.processor.v1","protocol_version":1,"request_id":"bridge-test-7","content_type":"text/plain; charset=utf-8","payload_hex":"4f4b"}"#;
             write!(
                 stream,

@@ -3,8 +3,10 @@
 //! The crate provides an injectable processor trait, a local HTTP client for the
 //! versioned LMLM Processor v1 service, and an extension adapter for the runtime.
 
+mod generation;
 mod http;
 
+pub use generation::GenerationParameters;
 pub use http::HttpLmlmProcessor;
 
 use lmlmxtend_api::{
@@ -89,6 +91,26 @@ pub trait LmlmProcessor: Send + Sync {
         context: &ExecutionContext,
     ) -> Result<ProcessorResponse, ProcessorError>;
 
+    /// Processes a request with explicit generation controls.
+    ///
+    /// Existing processor implementations remain source-compatible: implementations
+    /// that do not override this method accept the default (empty) configuration and
+    /// reject non-empty parameters rather than silently ignoring them.
+    fn process_with_parameters(
+        &self,
+        request: ProcessorRequest,
+        parameters: &GenerationParameters,
+        context: &ExecutionContext,
+    ) -> Result<ProcessorResponse, ProcessorError> {
+        parameters.validate()?;
+        if !parameters.is_empty() {
+            return Err(ProcessorError::InvalidInput(
+                "processor implementation does not support generation parameters".into(),
+            ));
+        }
+        self.process(request, context)
+    }
+
     /// A lightweight readiness check; it should not load weights or run inference.
     fn health_check(&self) -> Result<(), ProcessorError> {
         Ok(())
@@ -125,6 +147,16 @@ impl ProcessorBridge {
         request: ProcessorRequest,
         context: &ExecutionContext,
     ) -> Result<ProcessorResponse, ProcessorBridgeError> {
+        self.process_with_parameters(request, &GenerationParameters::default(), context)
+    }
+
+    /// Processes a request with validated generation parameters.
+    pub fn process_with_parameters(
+        &self,
+        request: ProcessorRequest,
+        parameters: &GenerationParameters,
+        context: &ExecutionContext,
+    ) -> Result<ProcessorResponse, ProcessorBridgeError> {
         context
             .check_cancelled()
             .map_err(ProcessorBridgeError::ExecutionControl)?;
@@ -134,9 +166,10 @@ impl ProcessorBridge {
                 limit: self.max_request_bytes,
             });
         }
+        parameters.validate().map_err(ProcessorBridgeError::Processor)?;
         let response = self
             .processor
-            .process(request, context)
+            .process_with_parameters(request, parameters, context)
             .map_err(ProcessorBridgeError::Processor)?;
         context
             .check_cancelled()

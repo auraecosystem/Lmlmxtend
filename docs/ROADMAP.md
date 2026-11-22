@@ -15,6 +15,7 @@
 - [x] Structured runtime errors with Display/Error implementations.
 - [ ] Tracing hooks.
 - [x] Cooperative cancellation tokens and monotonic request deadlines.
+- [x] Host-enforced response output-byte limits.
 - [ ] CPU, memory, concurrency accounting, and forced termination (requires isolation).
 - [x] Read-only extension health reporting.
 - [ ] Property tests and fuzz targets.

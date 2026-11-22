@@ -62,7 +62,7 @@ Each source worksheet becomes a separate worksheet in the output. Sheet names ar
 - Repository organization is always a plan; tracked and untracked repository files are not moved.
 - Local organization touches only direct child regular files, never recursively moves nested files, and avoids name collisions.
 - Symlinks and common dependency/build/cache directories are excluded from study.
-- Merge rejects symlink inputs and mixed extensions, and creates output with exclusive-create semantics. Text merge is capped at 32 MiB; PDF and DOCX merge are capped at 128 MiB combined input.
+- Merge rejects symlink inputs and mixed extensions, and creates output with exclusive-create semantics. Text merge is capped at 32 MiB; PDF, DOCX, and XLSX merge are capped at 128 MiB combined input.
 - Study hashes regular files up to 512 MiB each; it does not load entire files into memory.
 - Long operations poll the host cancellation/deadline context.
 

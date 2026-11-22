@@ -6,11 +6,7 @@
 
 use calamine::{open_workbook, Data, Reader, Xlsx};
 use rust_xlsxwriter::Workbook;
-use std::{
-    collections::HashSet,
-    convert::TryFrom,
-    path::PathBuf,
-};
+use std::{collections::HashSet, convert::TryFrom, path::PathBuf};
 
 const MAX_ROWS: u32 = 1_048_576;
 const MAX_COLUMNS: u32 = 16_384;

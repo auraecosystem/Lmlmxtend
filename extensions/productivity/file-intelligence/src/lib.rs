@@ -588,7 +588,7 @@ mod tests {
             "confirm": confirm
         });
         ExtensionRequest::new(
-            CapabilityId::new(&format!("files.{operation}")).unwrap(),
+            CapabilityId::new(format!("files.{operation}")).unwrap(),
             payload.to_string(),
         )
     }

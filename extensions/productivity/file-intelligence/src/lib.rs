@@ -664,6 +664,7 @@ fn merge_pdf_files(
     let mut merged = PdfDocument::with_version("1.5");
     let mut next_object_id = 1u32;
     let mut page_order: Vec<ObjectId> = Vec::new();
+    let mut page_objects = BTreeMap::new();
     let mut first_catalog: Option<(ObjectId, Dictionary)> = None;
     let mut first_pages: Option<(ObjectId, Dictionary)> = None;
 
@@ -720,6 +721,8 @@ fn merge_pdf_files(
 
         for page_id in source.get_pages().values() {
             page_order.push(*page_id);
+            let page = source.get_object(*page_id).map_err(execution_error)?.clone();
+            page_objects.insert(*page_id, page);
         }
 
         for (object_id, object) in source.objects {
@@ -732,6 +735,7 @@ fn merge_pdf_files(
         }
     }
 
+    merged.objects.extend(page_objects);
     let (catalog_id, mut catalog) = first_catalog
         .ok_or_else(|| ExtensionError::InvalidInput("no PDF catalog found".into()))?;
     let (pages_id, mut pages) = first_pages
@@ -1013,4 +1017,88 @@ mod tests {
         fs::write(&b, "b").unwrap();
         assert!(merge(vec![a, b.clone()], b, &ExecutionContext::default()).is_err());
     }
+
+    fn minimal_test_pdf() -> Vec<u8> {
+        use lopdf::{Dictionary, Document as PdfDocument, Object, Stream};
+
+        let mut document = PdfDocument::with_version("1.5");
+        let pages_id = document.new_object_id();
+        let content_id = document.add_object(Stream::new(Dictionary::new(), Vec::new()));
+        let page_id = document.add_object(lopdf::dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "Contents" => content_id,
+            "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()],
+        });
+        document.objects.insert(
+            pages_id,
+            Object::Dictionary(lopdf::dictionary! {
+                "Type" => "Pages",
+                "Kids" => vec![page_id.into()],
+                "Count" => 1,
+            }),
+        );
+        let catalog_id = document.add_object(lopdf::dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        document.trailer.set("Root", catalog_id);
+        let mut bytes = Vec::new();
+        document.save_to(&mut bytes).unwrap();
+        bytes
+    }
+
+    #[test]
+    fn pdf_merge_combines_page_trees_and_preserves_source_files() {
+        let dir = tempdir().unwrap();
+        let first = dir.path().join("first.pdf");
+        let second = dir.path().join("second.pdf");
+        let output = dir.path().join("combined.pdf");
+        fs::write(&first, minimal_test_pdf()).unwrap();
+        fs::write(&second, minimal_test_pdf()).unwrap();
+
+        merge(
+            vec![first.clone(), second.clone()],
+            output.clone(),
+            &ExecutionContext::default(),
+        )
+        .unwrap();
+
+        let merged = lopdf::Document::load(output).unwrap();
+        assert_eq!(merged.get_pages().len(), 2);
+        assert!(first.exists() && second.exists());
+    }
+
+    fn write_test_docx(path: &Path, text: &str) {
+        let document = docx_rs::Document::new().add_paragraph(
+            docx_rs::Paragraph::new().add_run(docx_rs::Run::new().add_text(text)),
+        );
+        docx_rs::Docx::new()
+            .document(document)
+            .pack(File::create(path).unwrap())
+            .unwrap();
+    }
+
+    #[test]
+    fn docx_merge_appends_body_content_and_preserves_inputs() {
+        let dir = tempdir().unwrap();
+        let first = dir.path().join("first.docx");
+        let second = dir.path().join("second.docx");
+        let output = dir.path().join("combined.docx");
+        write_test_docx(&first, "first document");
+        write_test_docx(&second, "second document");
+
+        merge(
+            vec![first.clone(), second.clone()],
+            output.clone(),
+            &ExecutionContext::default(),
+        )
+        .unwrap();
+
+        let bytes = fs::read(output).unwrap();
+        let merged = docx_rs::read_docx(&bytes).unwrap();
+        assert_eq!(merged.document.children.len(), 3);
+        assert!(first.exists() && second.exists());
+    }
+
 }

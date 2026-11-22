@@ -4,7 +4,13 @@ use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
 const CATEGORIES: &[&str] = &[
-    "creative", "language", "vision", "audio", "spatial", "agents", "productivity",
+    "creative",
+    "language",
+    "vision",
+    "audio",
+    "spatial",
+    "agents",
+    "productivity",
 ];
 
 fn main() {

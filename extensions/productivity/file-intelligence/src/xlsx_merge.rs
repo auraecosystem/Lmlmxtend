@@ -161,13 +161,8 @@ fn unique_sheet_name(candidate: &str, source_index: usize, used: &mut HashSet<St
         } else {
             format!(" ({attempt})")
         };
-        let base = if attempt == 1 {
-            sanitized.clone()
-        } else {
-            sanitized.clone()
-        };
         let max_base_chars = MAX_SHEET_NAME_CHARS.saturating_sub(suffix.chars().count());
-        let mut name: String = base.chars().take(max_base_chars).collect();
+        let mut name: String = sanitized.chars().take(max_base_chars).collect();
         name.push_str(&suffix);
 
         if name.is_empty() {

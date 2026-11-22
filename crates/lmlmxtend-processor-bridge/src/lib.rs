@@ -166,7 +166,9 @@ impl ProcessorBridge {
                 limit: self.max_request_bytes,
             });
         }
-        parameters.validate().map_err(ProcessorBridgeError::Processor)?;
+        parameters
+            .validate()
+            .map_err(ProcessorBridgeError::Processor)?;
         let response = self
             .processor
             .process_with_parameters(request, parameters, context)

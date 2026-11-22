@@ -11,7 +11,7 @@ use lmlmxtend_api::{
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeMap,
     fs::{self, File, OpenOptions},
     io::{BufRead, BufReader, BufWriter, Read, Write},
     path::{Path, PathBuf},
@@ -128,6 +128,14 @@ impl Extension for FileIntelligence {
         context.check_cancelled().map_err(execution_error)?;
         let operation: FileOperation = serde_json::from_str(&request.input)
             .map_err(|e| ExtensionError::InvalidInput(format!("expected operation JSON: {e}")))?;
+        let expected_capability = format!("files.{}", operation.operation);
+        if request.capability.as_str() != expected_capability {
+            return Err(ExtensionError::InvalidInput(format!(
+                "request capability '{}' does not match operation '{}'",
+                request.capability.as_str(),
+                operation.operation
+            )));
+        }
 
         let report = match operation.operation.as_str() {
             "study" => OperationReport::Study(study(

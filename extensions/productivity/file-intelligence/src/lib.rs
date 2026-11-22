@@ -568,6 +568,32 @@ mod tests {
     }
 
     #[test]
+    fn extension_returns_a_study_report_through_the_public_contract() {
+        let dir = tempdir().unwrap();
+        fs::write(dir.path().join("readme.md"), "hello").unwrap();
+        let response = FileIntelligence.execute(request("study", dir.path(), false)).unwrap();
+        assert_eq!(response.media_type, "application/json; charset=utf-8");
+        let report: serde_json::Value = serde_json::from_str(&response.output).unwrap();
+        assert_eq!(report["status"], "study");
+        assert_eq!(report["files_scanned"], 1);
+    }
+
+    #[test]
+    fn rejects_operation_when_capability_does_not_match() {
+        let dir = tempdir().unwrap();
+        let input = serde_json::json!({
+            "operation": "organize",
+            "root": dir.path(),
+            "confirm": false
+        }).to_string();
+        let request = ExtensionRequest::new(
+            CapabilityId::new("files.study").unwrap(),
+            input,
+        );
+        assert!(FileIntelligence.execute(request).is_err());
+    }
+
+    #[test]
     fn manifest_declares_file_capabilities() {
         let manifest = FileIntelligence.manifest();
         assert_eq!(manifest.id, "productivity.file-intelligence");

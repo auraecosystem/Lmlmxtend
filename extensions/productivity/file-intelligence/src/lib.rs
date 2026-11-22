@@ -137,7 +137,11 @@ impl Extension for FileIntelligence {
         context.check_cancelled().map_err(execution_error)?;
         let operation: FileOperation = serde_json::from_str(&request.input)
             .map_err(|e| ExtensionError::InvalidInput(format!("expected operation JSON: {e}")))?;
-        let expected_capability = format!("files.{}", operation.operation);
+        let expected_capability = if operation.operation == "arrange" {
+            "files.organize".to_owned()
+        } else {
+            format!("files.{}", operation.operation)
+        };
         if request.capability.as_str() != expected_capability {
             return Err(ExtensionError::InvalidInput(format!(
                 "request capability '{}' does not match operation '{}'",
@@ -148,7 +152,7 @@ impl Extension for FileIntelligence {
 
         let report = match operation.operation.as_str() {
             "study" => OperationReport::Study(study(required_root(operation.root)?, context)?),
-            "organize" => OperationReport::Organize(organize(
+            "organize" | "arrange" => OperationReport::Organize(organize(
                 required_root(operation.root)?,
                 operation.confirm,
                 context,
@@ -588,7 +592,12 @@ mod tests {
             "confirm": confirm
         });
         ExtensionRequest::new(
-            CapabilityId::new(format!("files.{operation}")).unwrap(),
+            CapabilityId::new(if operation == "arrange" {
+            "files.organize".to_owned()
+        } else {
+            format!("files.{operation}")
+        })
+        .unwrap(),
             payload.to_string(),
         )
     }
@@ -617,6 +626,18 @@ mod tests {
         .to_string();
         let request = ExtensionRequest::new(CapabilityId::new("files.study").unwrap(), input);
         assert!(FileIntelligence.execute(request).is_err());
+    }
+
+    #[test]
+    fn arrange_is_an_alias_for_safe_organization() {
+        let dir = tempdir().unwrap();
+        fs::write(dir.path().join("notes.txt"), "notes").unwrap();
+        let response = FileIntelligence
+            .execute(request("arrange", dir.path(), false))
+            .unwrap();
+        let report: serde_json::Value = serde_json::from_str(&response.output).unwrap();
+        assert_eq!(report["status"], "organize");
+        assert_eq!(report["dry_run"], true);
     }
 
     #[test]

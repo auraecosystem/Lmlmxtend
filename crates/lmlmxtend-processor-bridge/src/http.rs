@@ -309,6 +309,10 @@ mod tests {
                 request.extend_from_slice(&buffer[..count]);
             }
             assert_eq!(request.len(), expected_length);
+            let envelope: Value = serde_json::from_slice(&request[header_end + 4..]).unwrap();
+            let parameters = envelope.get("parameters").unwrap();
+            assert_eq!(parameters.get("max_tokens").and_then(Value::as_u64), Some(77));
+            assert_eq!(parameters.get("temperature").and_then(Value::as_f64), Some(0.25));
             let body = r#"{"protocol":"lmlm.processor.v1","protocol_version":1,"request_id":"bridge-test-7","content_type":"text/plain; charset=utf-8","payload_hex":"4f4b"}"#;
             write!(
                 stream,
@@ -323,7 +327,14 @@ mod tests {
         let mut request = ProcessorRequest::text("hello");
         request.correlation_id = Some("bridge-test-7".into());
         let response = processor
-            .process(request, &ExecutionContext::default())
+            .process_with_parameters(
+                request,
+                &GenerationParameters {
+                    max_tokens: Some(77),
+                    temperature: Some(0.25),
+                },
+                &ExecutionContext::default(),
+            )
             .unwrap();
         assert_eq!(response.payload, b"OK");
         assert_eq!(response.content_type, "text/plain; charset=utf-8");

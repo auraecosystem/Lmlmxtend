@@ -74,9 +74,9 @@ runtime.register(Arc::new(bridge))?;
 
 The Rust request type and wire protocol represent text, image, audio, video, and mixed-modality payloads. **The current LMLM backends execute text only.** Non-text requests are rejected by the backend; representing a modality in the envelope does not mean the model can process it.
 
-The generic extension request is string-based. Binary or modality-specific callers must use `ProcessorBridge::process` directly. The current Rust HTTP adapter sends an empty `parameters` object; native CPU generation therefore uses the LMLM backend defaults. A typed generation-parameter API and parameter forwarding are not yet implemented.
+The generic extension request is string-based. Binary or modality-specific callers must use `ProcessorBridge::process` directly. The Rust bridge now exposes `GenerationParameters` and forwards optional `max_tokens` (1–4096) and `temperature` (0–2) fields through the existing v1 `parameters` object. Unset values are omitted so each LMLM backend retains its own defaults. Validation occurs before network I/O. The v1 wire contract remains unchanged.
 
-Streaming, batching, device selection, modality-specific preprocessing/inference, and cross-process cancellation are not implemented.
+Capability discovery/negotiation is not exposed by the current LMLM v1 service; the client validates the fixed protocol identifier and version instead. Streaming, batching, device selection, modality-specific preprocessing/inference, and cross-process cancellation are not implemented.
 
 ## Limits and security boundaries
 

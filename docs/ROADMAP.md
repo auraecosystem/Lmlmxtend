@@ -33,7 +33,7 @@
 - [x] Register the concrete adapter through the `lmlm.process` runtime capability.
 - [x] Keep the LMLM model implementation and model assets in the LMLM repository.
 - [ ] Add an automated cross-project end-to-end test that starts the LMLM service and uses a real installed model.
-- [ ] Add a typed generation-parameter API and forward supported parameters through the Rust bridge.
+- [x] Add typed optional `max_tokens` and `temperature` parameters and forward them through the v1 bridge.
 
 **Milestone status:** the text-processing integration foundation is implemented. This does not mean the full multimodal processor is complete.
 
@@ -68,4 +68,4 @@
 - [ ] Permission grants and revocation.
 - [ ] Resource quotas and audit trail.
 
-A milestone is complete only when implementation, tests, documentation, and compatibility checks are present. Planned items are not current capabilities. The processor v1 checklist above distinguishes the implemented text integration from the still-missing automated real-model end-to-end test and generation-parameter forwarding.
+A milestone is complete only when implementation, tests, documentation, and compatibility checks are present. Planned items are not current capabilities. The processor v1 checklist distinguishes the implemented text integration and generation-parameter forwarding from the still-missing automated real-model end-to-end test. Capability negotiation remains deferred until the LMLM service exposes a capability-discovery endpoint.

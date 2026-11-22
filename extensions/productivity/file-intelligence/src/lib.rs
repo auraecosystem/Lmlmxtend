@@ -5,8 +5,8 @@
 //! is always report-only. This is trusted in-process code, not an OS sandbox.
 
 use lmlmxtend_api::{
-    CapabilityId, ExecutionContext, Extension, ExtensionError, ExtensionManifest,
-    ExtensionRequest, ExtensionResponse, API_VERSION,
+    CapabilityId, ExecutionContext, Extension, ExtensionError, ExtensionManifest, ExtensionRequest,
+    ExtensionResponse, API_VERSION,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -21,13 +21,22 @@ const MAX_INPUT_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_MERGE_BYTES: u64 = 32 * 1024 * 1024;
 const HASH_LIMIT_BYTES: u64 = 512 * 1024 * 1024;
 const SKIP_DIRS: &[&str] = &[
-    ".git", ".hg", ".svn", "node_modules", "target", "vendor",
-    ".venv", "venv", "__pycache__", ".cache", "dist", "build",
+    ".git",
+    ".hg",
+    ".svn",
+    "node_modules",
+    "target",
+    "vendor",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".cache",
+    "dist",
+    "build",
 ];
 const TEXT_EXTENSIONS: &[&str] = &[
-    "txt", "md", "markdown", "csv", "tsv", "log", "rst", "json",
-    "yaml", "yml", "toml", "xml", "html", "css", "js", "ts", "rs",
-    "py", "go", "java", "c", "h", "cpp", "sh", "sql",
+    "txt", "md", "markdown", "csv", "tsv", "log", "rst", "json", "yaml", "yml", "toml", "xml",
+    "html", "css", "js", "ts", "rs", "py", "go", "java", "c", "h", "cpp", "sh", "sql",
 ];
 
 #[derive(Clone, Debug, Deserialize)]
@@ -138,10 +147,7 @@ impl Extension for FileIntelligence {
         }
 
         let report = match operation.operation.as_str() {
-            "study" => OperationReport::Study(study(
-                required_root(operation.root)?,
-                context,
-            )?),
+            "study" => OperationReport::Study(study(required_root(operation.root)?, context)?),
             "organize" => OperationReport::Organize(organize(
                 required_root(operation.root)?,
                 operation.confirm,
@@ -187,13 +193,16 @@ fn canonical_directory(path: &Path) -> Result<PathBuf, ExtensionError> {
     let canonical = fs::canonicalize(path)
         .map_err(|e| ExtensionError::InvalidInput(format!("cannot open root: {e}")))?;
     if !canonical.is_dir() {
-        return Err(ExtensionError::InvalidInput("root must be a directory".into()));
+        return Err(ExtensionError::InvalidInput(
+            "root must be a directory".into(),
+        ));
     }
     Ok(canonical)
 }
 
 fn is_repository(root: &Path) -> bool {
-    root.ancestors().any(|ancestor| ancestor.join(".git").exists())
+    root.ancestors()
+        .any(|ancestor| ancestor.join(".git").exists())
 }
 
 fn category_for(extension: &str) -> &'static str {
@@ -206,8 +215,8 @@ fn category_for(extension: &str) -> &'static str {
         "xls" | "xlsx" | "ods" | "csv" => "Spreadsheets",
         "ppt" | "pptx" | "odp" => "Presentations",
         "zip" | "tar" | "gz" | "7z" | "rar" => "Archives",
-        "rs" | "go" | "py" | "js" | "ts" | "tsx" | "jsx" | "c" | "h"
-        | "cpp" | "java" | "swift" | "sh" | "sql" => "Code",
+        "rs" | "go" | "py" | "js" | "ts" | "tsx" | "jsx" | "c" | "h" | "cpp" | "java" | "swift"
+        | "sh" | "sql" => "Code",
         "md" | "txt" | "rst" | "log" => "Text",
         _ => "Other",
     }
@@ -293,7 +302,9 @@ fn study(root: PathBuf, context: &ExecutionContext) -> Result<StudyReport, Exten
             let digest = if bytes <= HASH_LIMIT_BYTES {
                 match hash_file(&path, context) {
                     Ok(hash) => {
-                        hashes.entry(hash.clone()).or_default()
+                        hashes
+                            .entry(hash.clone())
+                            .or_default()
                             .push(relative.display().to_string());
                         Some(hash)
                     }
@@ -305,7 +316,9 @@ fn study(root: PathBuf, context: &ExecutionContext) -> Result<StudyReport, Exten
             } else {
                 None
             };
-            let modified_unix_seconds = metadata.modified().ok()
+            let modified_unix_seconds = metadata
+                .modified()
+                .ok()
                 .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
                 .map(|duration| duration.as_secs());
             files.push(FileRecord {
@@ -325,11 +338,15 @@ fn study(root: PathBuf, context: &ExecutionContext) -> Result<StudyReport, Exten
     }
 
     files.sort_by(|a, b| a.path.cmp(&b.path));
-    let duplicate_candidates = hashes.into_iter()
+    let duplicate_candidates = hashes
+        .into_iter()
         .filter_map(|(sha256, mut paths)| {
             if paths.len() > 1 {
                 paths.sort();
-                Some(DuplicateGroup { sha256, files: paths })
+                Some(DuplicateGroup {
+                    sha256,
+                    files: paths,
+                })
             } else {
                 None
             }
@@ -349,7 +366,10 @@ fn study(root: PathBuf, context: &ExecutionContext) -> Result<StudyReport, Exten
 
 fn unique_destination(directory: &Path, filename: &str) -> PathBuf {
     let original = Path::new(filename);
-    let stem = original.file_stem().and_then(|s| s.to_str()).unwrap_or("file");
+    let stem = original
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("file");
     let extension = original.extension().and_then(|s| s.to_str());
     let mut candidate = directory.join(filename);
     let mut index = 1u32;
@@ -454,12 +474,14 @@ fn merge(
             "merge requires at least two input files".into(),
         ));
     }
-    let output_parent = output.parent().filter(|p| !p.as_os_str().is_empty())
+    let output_parent = output
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
     let output_parent = fs::canonicalize(output_parent).map_err(execution_error)?;
-    let output_name = output.file_name().ok_or_else(|| {
-        ExtensionError::InvalidInput("output must include a filename".into())
-    })?;
+    let output_name = output
+        .file_name()
+        .ok_or_else(|| ExtensionError::InvalidInput("output must include a filename".into()))?;
     let output = output_parent.join(output_name);
     let output_canonical_candidate = output.clone();
 
@@ -508,19 +530,20 @@ fn merge(
         )));
     }
 
-    let file = OpenOptions::new().write(true).create_new(true)
-        .open(&output).map_err(execution_error)?;
+    let file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&output)
+        .map_err(execution_error)?;
     let mut writer = BufWriter::new(file);
     let mut bytes_written = 0u64;
     for (index, input) in canonical_inputs.iter().enumerate() {
         context.check_cancelled().map_err(execution_error)?;
         let name = input.file_name().unwrap_or_default().to_string_lossy();
-        let separator = format!(
-            "\n\n===== FILE {}: {} =====\n",
-            index + 1,
-            name
-        );
-        writer.write_all(separator.as_bytes()).map_err(execution_error)?;
+        let separator = format!("\n\n===== FILE {}: {} =====\n", index + 1, name);
+        writer
+            .write_all(separator.as_bytes())
+            .map_err(execution_error)?;
         bytes_written += separator.len() as u64;
         let mut reader = BufReader::new(File::open(input).map_err(execution_error)?);
         let mut line = String::new();
@@ -545,7 +568,10 @@ fn merge(
 
     Ok(MergeReport {
         output: output.display().to_string(),
-        inputs: canonical_inputs.iter().map(|p| p.display().to_string()).collect(),
+        inputs: canonical_inputs
+            .iter()
+            .map(|p| p.display().to_string())
+            .collect(),
         bytes_written,
     })
 }
@@ -571,7 +597,9 @@ mod tests {
     fn extension_returns_a_study_report_through_the_public_contract() {
         let dir = tempdir().unwrap();
         fs::write(dir.path().join("readme.md"), "hello").unwrap();
-        let response = FileIntelligence.execute(request("study", dir.path(), false)).unwrap();
+        let response = FileIntelligence
+            .execute(request("study", dir.path(), false))
+            .unwrap();
         assert_eq!(response.media_type, "application/json; charset=utf-8");
         let report: serde_json::Value = serde_json::from_str(&response.output).unwrap();
         assert_eq!(report["status"], "study");
@@ -585,11 +613,9 @@ mod tests {
             "operation": "organize",
             "root": dir.path(),
             "confirm": false
-        }).to_string();
-        let request = ExtensionRequest::new(
-            CapabilityId::new("files.study").unwrap(),
-            input,
-        );
+        })
+        .to_string();
+        let request = ExtensionRequest::new(CapabilityId::new("files.study").unwrap(), input);
         assert!(FileIntelligence.execute(request).is_err());
     }
 
@@ -619,12 +645,18 @@ mod tests {
         let dir = tempdir().unwrap();
         let file = dir.path().join("notes.txt");
         fs::write(&file, "notes").unwrap();
-        let dry = organize(dir.path().to_path_buf(), false, &ExecutionContext::default()).unwrap();
+        let dry = organize(
+            dir.path().to_path_buf(),
+            false,
+            &ExecutionContext::default(),
+        )
+        .unwrap();
         assert!(dry.dry_run);
         assert!(file.exists());
 
         fs::create_dir(dir.path().join(".git")).unwrap();
-        let repo_plan = organize(dir.path().to_path_buf(), true, &ExecutionContext::default()).unwrap();
+        let repo_plan =
+            organize(dir.path().to_path_buf(), true, &ExecutionContext::default()).unwrap();
         assert!(repo_plan.repository);
         assert!(repo_plan.dry_run);
         assert!(file.exists());
@@ -635,7 +667,8 @@ mod tests {
         let dir = tempdir().unwrap();
         let file = dir.path().join("notes.txt");
         fs::write(&file, "notes").unwrap();
-        let report = organize(dir.path().to_path_buf(), true, &ExecutionContext::default()).unwrap();
+        let report =
+            organize(dir.path().to_path_buf(), true, &ExecutionContext::default()).unwrap();
         assert!(!report.dry_run);
         assert!(!file.exists());
         assert!(dir.path().join("Text/notes.txt").exists());
@@ -649,7 +682,12 @@ mod tests {
         let out = dir.path().join("combined.md");
         fs::write(&a, "alpha").unwrap();
         fs::write(&b, "beta").unwrap();
-        merge(vec![a.clone(), b.clone()], out.clone(), &ExecutionContext::default()).unwrap();
+        merge(
+            vec![a.clone(), b.clone()],
+            out.clone(),
+            &ExecutionContext::default(),
+        )
+        .unwrap();
         let content = fs::read_to_string(out).unwrap();
         assert!(content.contains("alpha"));
         assert!(content.contains("beta"));

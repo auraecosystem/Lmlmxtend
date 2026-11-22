@@ -6,7 +6,7 @@ It provides stable contracts and application-facing capabilities without reimple
 
 ## Project boundaries
 
-- **LMLM** — the Large Multi-Functional Linear Model: the in-built neural processor and intelligence core.
+- **LMLM** — the Large Multimodal Local Model: the in-built neural processor and intelligence core.
 - **LMLMxtend** — extension contracts, capability orchestration, runtime services, multimodal interfaces, agents, adapters, and SDKs.
 - **Olgin** — a creative application that may consume LMLMxtend through an optional integration.
 
@@ -14,16 +14,17 @@ LMLMxtend is application-independent. Olgin is one possible consumer, not a depe
 
 ## Current implementation
 
-The initial Rust workspace contains:
+The Rust workspace contains:
 
 - `lmlmxtend-api`: versioned extension and capability contracts.
 - `lmlmxtend-core`: runtime configuration, capability identifiers, and execution policy.
 - `lmlmxtend-runtime`: an in-process extension registry, read-only capability discovery, and policy-checked dispatcher.
+- `lmlmxtend-processor-bridge`: a typed, modality-aware boundary with a loopback-only HTTP client for the versioned LMLM Processor v1 service.
 - `lmlmxtend-intelligence`: deterministic capability-aware task planning and dispatch with API-version checks and explicit provider preferences.
 - `lmlmxtend-agent-runtime`: permission-aware agent registration, bounded delegation, deterministic DAG plans, bounded parallel execution, per-execution shared state and messaging, capability invocation, and lifecycle propagation.
 - `lmlmxtend-extension-forge`: a native CLI that scaffolds validated, standalone extension crates.
 
-The agent-plan scheduler validates dependencies and agent registrations before execution. Goal-planner proposals submitted through `execute_goal` are also capped at 8 MiB of aggregate task input and plan metadata before any agent starts. Independent tasks can run in bounded parallel batches (up to 32 workers), while dependency waves preserve ordering. Agents share an isolated in-memory key/value store and bounded mailboxes within one root execution. The scheduler is fail-fast at batch boundaries; it does not yet provide durable workflows or distributed workers.
+Goal-planner proposals submitted through `execute_goal` are capped at 8 MiB of aggregate task input and plan metadata before any agent starts. Independent tasks can run in bounded parallel batches (up to 32 workers), while dependency waves preserve ordering. Agents share an isolated in-memory key/value store and bounded mailboxes within one root execution. The scheduler is fail-fast at batch boundaries; it does not yet provide durable workflows or distributed workers.
 
 The current dispatcher is an integration foundation. It does **not** contain neural-network weights, inference kernels, a model implementation, or a production sandbox.
 
@@ -40,7 +41,29 @@ cargo run --example basic_agent -p lmlmxtend-agent-runtime
 cargo run -p lmlmxtend-extension-forge -- new --name scene-composer --category creative --capability creative.compose
 ```
 
-See [Architecture](docs/ARCHITECTURE.md), [Security](docs/SECURITY.md), [Extension Forge](docs/EXTENSION_FORGE.md), [Intelligence Routing](docs/INTELLIGENCE_ROUTING.md), [Agent Runtime](docs/AGENT_RUNTIME.md), and [Roadmap](docs/ROADMAP.md).
+## Developer scripts
+
+Use the shared scripts for repeatable local checks and CI:
+
+```bash
+bash scripts/verify.sh
+bash scripts/smoke.sh
+```
+
+Windows PowerShell equivalents:
+
+```powershell
+pwsh -File scripts/verify.ps1
+pwsh -File scripts/smoke.ps1
+```
+
+Scaffold an extension through the cross-platform wrapper:
+
+```bash
+bash scripts/new-extension.sh --name scene-composer --category creative --capability creative.compose
+```
+
+See [Processor Bridge](docs/PROCESSOR_BRIDGE.md), [Developer scripts](scripts/README.md), [Architecture](docs/ARCHITECTURE.md), [Security](docs/SECURITY.md), [Extension Forge](docs/EXTENSION_FORGE.md), [Intelligence Routing](docs/INTELLIGENCE_ROUTING.md), [Agent Runtime](docs/AGENT_RUNTIME.md), and [Roadmap](docs/ROADMAP.md).
 
 ## Design principles
 

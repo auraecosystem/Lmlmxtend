@@ -1,6 +1,8 @@
-cargo test --workspace
-cargo run --example basic_extension -p lmlmxtend-runtime
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Generate a new creative extension
-cargo run -p lmlmxtend-extension-forge -- new --name scene-composer --category creative --capability creative.compose
-cargo run -p lmlmxtend-extension-forge -- new --name scene-composer --category creative --capability creative.compose
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT"
+
+bash scripts/verify.sh
+bash scripts/smoke.sh

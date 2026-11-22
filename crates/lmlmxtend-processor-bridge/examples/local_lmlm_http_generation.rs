@@ -5,7 +5,7 @@
 
 use lmlmxtend_api::ExecutionContext;
 use lmlmxtend_processor_bridge::{
-    GenerationParameters, HttpLmlmProcessor, ProcessorBridge, ProcessorRequest,
+    GenerationParameters, HttpLmlmProcessor, LmlmProcessor, ProcessorBridge, ProcessorRequest,
 };
 use std::net::SocketAddr;
 use std::sync::Arc;

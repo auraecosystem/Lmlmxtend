@@ -30,8 +30,7 @@ pub(super) fn merge_xlsx_files(
             .check_cancelled()
             .map_err(super::execution_error)?;
 
-        let mut source: Xlsx<_> =
-            open_workbook(input).map_err(super::execution_error)?;
+        let mut source: Xlsx<_> = open_workbook(input).map_err(super::execution_error)?;
         let sheet_names = source.sheet_names().to_owned();
         if sheet_names.is_empty() {
             return Err(super::ExtensionError::InvalidInput(format!(
@@ -86,9 +85,7 @@ pub(super) fn merge_xlsx_files(
 
                 for (column_offset, cell) in cells.iter().enumerate() {
                     let column = start_column
-                        .checked_add(
-                            u32::try_from(column_offset).map_err(super::execution_error)?,
-                        )
+                        .checked_add(u32::try_from(column_offset).map_err(super::execution_error)?)
                         .ok_or_else(|| {
                             super::ExtensionError::InvalidInput(
                                 "XLSX worksheet column index overflow".into(),
@@ -143,9 +140,7 @@ pub(super) fn merge_xlsx_files(
         ));
     }
 
-    context
-        .check_cancelled()
-        .map_err(super::execution_error)?;
+    context.check_cancelled().map_err(super::execution_error)?;
     let bytes = output_workbook
         .save_to_buffer()
         .map_err(super::execution_error)?;
@@ -153,7 +148,10 @@ pub(super) fn merge_xlsx_files(
 
     Ok(super::MergeReport {
         output: output.display().to_string(),
-        inputs: inputs.iter().map(|path| path.display().to_string()).collect(),
+        inputs: inputs
+            .iter()
+            .map(|path| path.display().to_string())
+            .collect(),
         bytes_written: bytes.len() as u64,
     })
 }

@@ -19,13 +19,13 @@ try {
     cargo clippy --manifest-path $FileIntelligence --all-targets -- -D warnings
     if ($LASTEXITCODE -ne 0) { throw "File Intelligence cargo clippy failed" }
 
-    Write-Host "==> Workspace tests"
-    cargo test --workspace
-    if ($LASTEXITCODE -ne 0) { throw "Workspace cargo test failed" }
-
     Write-Host "==> File Intelligence tests"
     cargo test --manifest-path $FileIntelligence
     if ($LASTEXITCODE -ne 0) { throw "File Intelligence cargo test failed" }
+
+    Write-Host "==> Workspace tests"
+    cargo test --workspace
+    if ($LASTEXITCODE -ne 0) { throw "Workspace cargo test failed" }
 
     Write-Host "LMLMxtend verification completed successfully."
 }

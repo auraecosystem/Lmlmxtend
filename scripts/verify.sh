@@ -17,10 +17,10 @@ cargo clippy --workspace --all-targets -- -D warnings
 echo "==> Clippy (File Intelligence)"
 cargo clippy --manifest-path "$FILE_INTELLIGENCE" --all-targets -- -D warnings
 
-echo "==> Workspace tests"
-cargo test --workspace
-
 echo "==> File Intelligence tests"
 cargo test --manifest-path "$FILE_INTELLIGENCE"
+
+echo "==> Workspace tests"
+cargo test --workspace"
 
 echo "LMLMxtend verification completed successfully."

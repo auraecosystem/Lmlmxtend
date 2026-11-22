@@ -9,7 +9,6 @@ use rust_xlsxwriter::Workbook;
 use std::{
     collections::HashSet,
     convert::TryFrom,
-    fs,
     path::{Path, PathBuf},
 };
 
@@ -105,8 +104,16 @@ pub(super) fn merge_xlsx_files(
 
                     match cell {
                         Data::Empty => {}
+                        Data::Int(value)
+                            if (-9_007_199_254_740_992i64..=9_007_199_254_740_992i64)
+                                .contains(value) =>
+                        {
+                            worksheet
+                                .write_number(row, column, *value as f64)
+                                .map_err(super::execution_error)?
+                        }
                         Data::Int(value) => worksheet
-                            .write_number(row, column, *value as f64)
+                            .write_string(row, column, value.to_string())
                             .map_err(super::execution_error)?,
                         Data::Float(value) if value.is_finite() => worksheet
                             .write_number(row, column, *value)

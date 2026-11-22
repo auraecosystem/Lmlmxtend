@@ -74,9 +74,25 @@ runtime.register(Arc::new(bridge))?;
 
 The Rust request type and wire protocol represent text, image, audio, video, and mixed-modality payloads. **The current LMLM backends execute text only.** Non-text requests are rejected by the backend; representing a modality in the envelope does not mean the model can process it.
 
-The generic extension request is string-based. Binary or modality-specific callers must use `ProcessorBridge::process` directly. The Rust bridge now exposes `GenerationParameters` and forwards optional `max_tokens` (1–4096) and `temperature` (0–2) fields through the existing v1 `parameters` object. Unset values are omitted so each LMLM backend retains its own defaults. Validation occurs before network I/O. The v1 wire contract remains unchanged.
+The generic extension request is string-based. Binary or modality-specific callers must use `ProcessorBridge::process` directly. The Rust bridge exposes `GenerationParameters` and forwards optional `max_tokens` (1–4096) and `temperature` (0–2) fields through the existing v1 `parameters` object. Unset values are omitted so each LMLM backend retains its own defaults. Validation occurs before network I/O. The v1 wire contract remains unchanged.
 
 Capability discovery/negotiation is not exposed by the current LMLM v1 service; the client validates the fixed protocol identifier and version instead. Streaming, batching, device selection, modality-specific preprocessing/inference, and cross-process cancellation are not implemented.
+
+## Native LMLM cross-project end-to-end test
+
+The repository includes a runner that starts the actual Python LMLM Processor v1 service in `native_cpu` mode, waits for its health endpoint, and invokes the Rust bridge with explicit generation parameters. It requires an installed LMLM model; it does not download weights or substitute a mock model.
+
+Set the paths to the two existing checkouts and run from LMLMxtend:
+
+```bash
+LMLM_REPO_ROOT=/path/to/lmlm \
+LMLM_MODEL_DIR=/path/to/installed-lmlm-model \
+bash scripts/e2e_native_lmlm.sh
+```
+
+The model directory must contain `lmlm-model.json` and all assets referenced by its manifest. The runner binds the service to IPv4 loopback only, terminates the service on exit, and fails if startup, health validation, Rust inference, or output validation fails. You can override `PYTHON`, `LMLM_PROCESSOR_PORT`, and the Rust client address is set from that port automatically.
+
+This is a real-model test, not part of the default hosted CI because model weights are operator-installed local assets and are not committed to either repository. Run it on a machine that has the model and Python dependencies installed.
 
 ## Limits and security boundaries
 
@@ -105,4 +121,4 @@ From the LMLM repository:
 python -m unittest tests.test_processor_v1 -v
 ```
 
-These commands are the expected validation path. A passing unit-test result does not replace an end-to-end run with a real local model installed and the service listening on loopback.
+These commands validate the components separately. The native cross-project runner above is the required end-to-end check for a real installed model; a passing unit-test result does not replace it.

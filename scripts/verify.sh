@@ -21,6 +21,6 @@ echo "==> File Intelligence tests"
 cargo test --manifest-path "$FILE_INTELLIGENCE"
 
 echo "==> Workspace tests"
-cargo test --workspace"
+cargo test --workspace
 
 echo "LMLMxtend verification completed successfully."

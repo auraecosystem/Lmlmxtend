@@ -784,12 +784,9 @@ fn merge_docx_files(
     output: PathBuf,
     context: &ExecutionContext,
 ) -> Result<MergeReport, ExtensionError> {
-    use docx_rs::{read_docx, Docx, DocumentChild, Paragraph, Run};
+    use docx_rs::{read_docx, DocumentChild, Docx, Paragraph, Run};
 
-    fn validate_appended_docx(
-        document: &Docx,
-        path: &Path,
-    ) -> Result<(), ExtensionError> {
+    fn validate_appended_docx(document: &Docx, path: &Path) -> Result<(), ExtensionError> {
         let relationships = &document.document_rels;
         let has_external_parts = relationships.has_comments
             || relationships.has_numberings
@@ -810,9 +807,12 @@ fn merge_docx_files(
             )));
         }
 
-        if document.document.children.iter().any(|child| {
-            !matches!(child, DocumentChild::Paragraph(_) | DocumentChild::Table(_))
-        }) {
+        if document
+            .document
+            .children
+            .iter()
+            .any(|child| !matches!(child, DocumentChild::Paragraph(_) | DocumentChild::Table(_)))
+        {
             return Err(ExtensionError::InvalidInput(format!(
                 "DOCX input '{}' contains body elements that require cross-document relationship remapping",
                 path.display()
@@ -836,7 +836,12 @@ fn merge_docx_files(
         let base = merged.as_mut().expect("first DOCX was loaded");
 
         for style in current.styles.styles.drain(..) {
-            if let Some(existing) = base.styles.styles.iter().find(|item| item.style_id == style.style_id) {
+            if let Some(existing) = base
+                .styles
+                .styles
+                .iter()
+                .find(|item| item.style_id == style.style_id)
+            {
                 if existing != &style {
                     return Err(ExtensionError::InvalidInput(format!(
                         "DOCX style '{}' conflicts between source documents",
@@ -852,15 +857,22 @@ fn merge_docx_files(
             .file_name()
             .and_then(|name| name.to_str())
             .unwrap_or("document");
-        base.document.children.push(DocumentChild::Paragraph(Box::new(
-            Paragraph::new().add_run(
-                Run::new().add_text(format!("— Source document {}: {} —", index + 1, source_name)),
-            ),
-        )));
-        base.document.children.append(&mut current.document.children);
+        base.document
+            .children
+            .push(DocumentChild::Paragraph(Box::new(
+                Paragraph::new().add_run(Run::new().add_text(format!(
+                    "— Source document {}: {} —",
+                    index + 1,
+                    source_name
+                ))),
+            )));
+        base.document
+            .children
+            .append(&mut current.document.children);
     }
 
-    let merged = merged.ok_or_else(|| ExtensionError::InvalidInput("no DOCX inputs supplied".into()))?;
+    let merged =
+        merged.ok_or_else(|| ExtensionError::InvalidInput("no DOCX inputs supplied".into()))?;
     let mut cursor = Cursor::new(Vec::new());
     merged.pack(&mut cursor).map_err(execution_error)?;
     let bytes = cursor.into_inner();
@@ -1070,9 +1082,8 @@ mod tests {
     }
 
     fn write_test_docx(path: &Path, text: &str) {
-        let document = docx_rs::Document::new().add_paragraph(
-            docx_rs::Paragraph::new().add_run(docx_rs::Run::new().add_text(text)),
-        );
+        let document = docx_rs::Document::new()
+            .add_paragraph(docx_rs::Paragraph::new().add_run(docx_rs::Run::new().add_text(text)));
         docx_rs::Docx::new()
             .document(document)
             .pack(File::create(path).unwrap())
@@ -1100,5 +1111,4 @@ mod tests {
         assert_eq!(merged.document.children.len(), 3);
         assert!(first.exists() && second.exists());
     }
-
 }

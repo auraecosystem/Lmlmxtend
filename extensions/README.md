@@ -8,6 +8,7 @@ LMLMxtend extensions are grouped by capability domain:
 - audio/ — speech, sound, and audio-processing interfaces.
 - spatial/ — 3D, XR, geometry, and spatial interaction interfaces.
 - agents/ — task-oriented agent extensions.
+- productivity/ — local file intelligence, organization, and workflow utilities.
 
 Create an extension with the native generator:
 
@@ -15,6 +16,9 @@ Create an extension with the native generator:
 
 The generator creates a standalone Rust crate, extension descriptor, tested API
 implementation template, and README. It refuses to overwrite existing files.
+The productivity file-intelligence extension is available at
+`extensions/productivity/file-intelligence`; see its README and
+`docs/FILE_INTELLIGENCE.md`.
 
 Generated extensions are not automatically loaded by the runtime. Registration,
 permission policy, and sandboxing remain explicit host responsibilities.

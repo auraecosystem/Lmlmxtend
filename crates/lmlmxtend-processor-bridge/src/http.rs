@@ -271,7 +271,7 @@ mod tests {
                 let count = stream.read(&mut buffer).unwrap();
                 assert!(count > 0, "client closed before sending HTTP headers");
                 request.extend_from_slice(&buffer[..count]);
-                if let Some(position) = request.windows(4).position(|part| part == b"\\r\\n\\r\\n") {
+                if let Some(position) = request.windows(4).position(|part| part == b"\r\n\r\n") {
                     break position;
                 }
             };

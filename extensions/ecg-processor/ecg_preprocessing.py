@@ -167,14 +167,14 @@ def run_lmlmxtend_capability(raw_payload: str):
 
     data, header = load_challenge_data(file_path)
     filtered = bandpass_filter(data)
-    vitals = extract_r_peaks_and_bpm(filtered[1])  # Lead II rhythm analysis
+     vitals = extract_r_peaks_and_bpm(filtered[1]) (selects Lead II)  # Lead II rhythm analysis
 
     return {
         "status": "ok",
         "capability": capability,
         "contract_version": "v1",
         "num_leads": int(data.shape[0]),
-        "samples": int(data.shape[1]),
+         "samples": int(data.shape[1]),
         "vitals": vitals
     }
 

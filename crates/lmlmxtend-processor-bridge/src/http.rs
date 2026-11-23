@@ -1,6 +1,9 @@
 //! HTTP transport for the versioned, loopback-only LMLM Processor v1 service.
 
-use crate::{LmlmProcessor, Modality, ProcessorError, ProcessorRequest, ProcessorResponse};
+use crate::{
+    GenerationParameters, LmlmProcessor, Modality, ProcessorError, ProcessorRequest,
+    ProcessorResponse,
+};
 use lmlmxtend_api::ExecutionContext;
 use serde_json::{json, Value};
 use std::io::{Read, Write};
@@ -116,9 +119,19 @@ impl LmlmProcessor for HttpLmlmProcessor {
         request: ProcessorRequest,
         context: &ExecutionContext,
     ) -> Result<ProcessorResponse, ProcessorError> {
+        self.process_with_parameters(request, &GenerationParameters::default(), context)
+    }
+
+    fn process_with_parameters(
+        &self,
+        request: ProcessorRequest,
+        parameters: &GenerationParameters,
+        context: &ExecutionContext,
+    ) -> Result<ProcessorResponse, ProcessorError> {
         context
             .check_cancelled()
             .map_err(|error| ProcessorError::Failed(error.to_string()))?;
+        parameters.validate()?;
         let request_id = request.correlation_id.unwrap_or_else(|| {
             format!(
                 "lmlmxtend-{}",
@@ -132,6 +145,13 @@ impl LmlmProcessor for HttpLmlmProcessor {
             Modality::Video => "video",
             Modality::Multimodal => "multimodal",
         };
+        let mut wire_parameters = serde_json::Map::new();
+        if let Some(max_tokens) = parameters.max_tokens {
+            wire_parameters.insert("max_tokens".into(), json!(max_tokens));
+        }
+        if let Some(temperature) = parameters.temperature {
+            wire_parameters.insert("temperature".into(), json!(temperature));
+        }
         let body = json!({
             "protocol": PROTOCOL,
             "protocol_version": PROTOCOL_VERSION,
@@ -140,7 +160,7 @@ impl LmlmProcessor for HttpLmlmProcessor {
             "content_type": request.content_type,
             "payload_hex": encode_hex(&request.payload),
             "prompt": request.prompt,
-            "parameters": {},
+            "parameters": wire_parameters,
         })
         .to_string();
         let (status, response_body) = self.exchange("POST", "/v1/process", body.as_bytes())?;
@@ -265,8 +285,43 @@ mod tests {
         let address = listener.local_addr().unwrap();
         let server = thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
-            let mut request = [0_u8; 4096];
-            let _ = stream.read(&mut request).unwrap();
+            let mut request = Vec::new();
+            let mut buffer = [0_u8; 1024];
+            let header_end = loop {
+                let count = stream.read(&mut buffer).unwrap();
+                assert!(count > 0, "client closed before sending HTTP headers");
+                request.extend_from_slice(&buffer[..count]);
+                if let Some(position) = request.windows(4).position(|part| part == b"\r\n\r\n") {
+                    break position;
+                }
+            };
+            let headers = std::str::from_utf8(&request[..header_end]).unwrap();
+            let content_length = headers
+                .lines()
+                .find_map(|line| {
+                    let (name, value) = line.split_once(':')?;
+                    name.eq_ignore_ascii_case("content-length")
+                        .then(|| value.trim().parse::<usize>().ok())
+                        .flatten()
+                })
+                .expect("request must include Content-Length");
+            let expected_length = header_end + 4 + content_length;
+            while request.len() < expected_length {
+                let count = stream.read(&mut buffer).unwrap();
+                assert!(count > 0, "client closed before sending the HTTP body");
+                request.extend_from_slice(&buffer[..count]);
+            }
+            assert_eq!(request.len(), expected_length);
+            let envelope: Value = serde_json::from_slice(&request[header_end + 4..]).unwrap();
+            let parameters = envelope.get("parameters").unwrap();
+            assert_eq!(
+                parameters.get("max_tokens").and_then(Value::as_u64),
+                Some(77)
+            );
+            assert_eq!(
+                parameters.get("temperature").and_then(Value::as_f64),
+                Some(0.25)
+            );
             let body = r#"{"protocol":"lmlm.processor.v1","protocol_version":1,"request_id":"bridge-test-7","content_type":"text/plain; charset=utf-8","payload_hex":"4f4b"}"#;
             write!(
                 stream,
@@ -281,7 +336,14 @@ mod tests {
         let mut request = ProcessorRequest::text("hello");
         request.correlation_id = Some("bridge-test-7".into());
         let response = processor
-            .process(request, &ExecutionContext::default())
+            .process_with_parameters(
+                request,
+                &GenerationParameters {
+                    max_tokens: Some(77),
+                    temperature: Some(0.25),
+                },
+                &ExecutionContext::default(),
+            )
             .unwrap();
         assert_eq!(response.payload, b"OK");
         assert_eq!(response.content_type, "text/plain; charset=utf-8");

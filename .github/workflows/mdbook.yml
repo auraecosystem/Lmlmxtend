@@ -50,7 +50,9 @@ jobs:
           path: ./book
 
   # Deployment job
+  # Pull requests validate the book but must not publish the production Pages site.
   deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

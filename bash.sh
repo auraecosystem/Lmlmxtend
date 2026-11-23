@@ -1,8 +1,2 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$ROOT"
-
-bash scripts/verify.sh
-bash scripts/smoke.sh
+bash scripts/new-extension.sh --name ecg-processor --category signal --capability signal.ecg.analyze
+cargo test -p lmlmxtend-ext-ecg-processor -- --nocapture

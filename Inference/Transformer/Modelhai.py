@@ -254,7 +254,6 @@ def residual_network_1d():
     output_block_1 = keras.layers.Activation('relu')(output_block_1)
 
     # BLOCK 2
-
     conv_x = keras.layers.Conv1D(filters=n_feature_maps * 2, kernel_size=8, padding='same')(output_block_1)
     conv_x = keras.layers.BatchNormalization()(conv_x)
     conv_x = keras.layers.Activation('relu')(conv_x)
@@ -2592,7 +2591,8 @@ class ProductionLMLMOrchestrator:
         failed_obs = len([o for o in trace.observations if not o.success])
         logger.info(f"Task Metrics -> Steps: {total_steps}, Errors: {failed_obs}")
 Canonical Roadmap & Build Sequence
-LMLM Canonical Roadmap
+# LMLM Canonical Roadmap
+
 ├── v1.0 — Core Runtime (Task -> State -> DAG Planner -> Policy Engine -> Async Tool Execution -> Verifier)
 ├── v1.1 — Model Adapter Engine (Async OpenAI, Anthropic, Ollama, vLLM, local GGUF)
 ├── v1.2 — Memory & RAG Systems (Vector stores, semantic chunking, provenance, episodic recall)

@@ -1,8 +1,8 @@
+use lmlmxtend_ext_ecg_processor::EcgProcessorExtension;
+use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
-use lmlmxtend_ext_ecg_processor::EcgProcessorExtension;
-use serde_json::json;
 
 /// Helper: Generates a synthetic 12-lead ECG (.mat + .hea) at 500 Hz (60 BPM)
 fn create_synthetic_ecg_pair(dir: &PathBuf) -> PathBuf {
@@ -94,5 +94,7 @@ fn test_rejects_oversized_payload_over_8mib() {
 
     let result = extension.execute(request);
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("exceeds LMLMxtend 8 MiB limit"));
+    assert!(result
+        .unwrap_err()
+        .contains("exceeds LMLMxtend 8 MiB limit"));
 }

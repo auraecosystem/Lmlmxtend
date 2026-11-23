@@ -165,16 +165,28 @@ def run_lmlmxtend_capability(raw_payload: str):
     if not file_path or not os.path.exists(file_path):
         return {"status": "error", "error": f"ECG file not found: {file_path}"}
 
-    data, header = load_challenge_data(file_path)
-    filtered = bandpass_filter(data)
-     vitals = extract_r_peaks_and_bpm(filtered[1]) (selects Lead II)  # Lead II rhythm analysis
+    if capability != "signal.ecg.analyze":
+        return {"status": "error", "error": f"Unsupported capability: {capability}"}
+
+    apply_filter = bool(request.get("apply_filter", True))
+    data, _header = load_challenge_data(file_path)
+
+    if data.ndim != 2 or data.shape[0] != 12:
+        return {
+            "status": "error",
+            "error": f"Expected a 12-lead ECG matrix, got shape {data.shape}"
+        }
+
+    processed = bandpass_filter(data) if apply_filter else data
+    # Lead II (index 1) is used for rhythm analysis.
+    vitals = extract_r_peaks_and_bpm(processed[1])
 
     return {
         "status": "ok",
         "capability": capability,
         "contract_version": "v1",
         "num_leads": int(data.shape[0]),
-         "samples": int(data.shape[1]),
+        "samples": int(data.shape[1]),
         "vitals": vitals
     }
 

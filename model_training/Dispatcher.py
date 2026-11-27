@@ -69,7 +69,7 @@ class MetalHashStore:
 
         self.table_keys = self._buffer(
             capacity * 4,
-            initialize=b"\\xff" * (capacity * 4),
+            initialize=b"\xff" * (capacity * 4),
         )
         self.table_values = self._buffer(capacity * 4)
 

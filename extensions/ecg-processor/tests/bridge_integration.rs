@@ -1,11 +1,11 @@
 use lmlmxtend_ext_ecg_processor::EcgProcessorExtension;
 use serde_json::json;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// Helper: Generates a synthetic 12-lead ECG (.mat + .hea) at 500 Hz (60 BPM)
-fn create_synthetic_ecg_pair(dir: &PathBuf) -> PathBuf {
+fn create_synthetic_ecg_pair(dir: &Path) -> PathBuf {
     let mat_path = dir.join("synthetic_patient.mat");
     let hea_path = dir.join("synthetic_patient.hea");
 

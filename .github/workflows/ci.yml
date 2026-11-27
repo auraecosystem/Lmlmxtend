@@ -23,7 +23,29 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Python test dependencies
+        run: |
+          python -m pip install --disable-pip-version-check numpy scipy
+          python -m pip install --disable-pip-version-check torch --index-url https://download.pytorch.org/whl/cpu
       - name: Verify formatting, lint and tests
         run: bash scripts/verify.sh
       - name: Run examples and generated-extension smoke tests
         run: bash scripts/smoke.sh
+
+  file-intelligence:
+    name: File Intelligence extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --manifest-path extensions/productivity/file-intelligence/Cargo.toml -- --check
+      - name: Run Clippy
+        run: cargo clippy --manifest-path extensions/productivity/file-intelligence/Cargo.toml --all-targets -- -D warnings
+      - name: Run extension tests
+        run: cargo test --manifest-path extensions/productivity/file-intelligence/Cargo.toml

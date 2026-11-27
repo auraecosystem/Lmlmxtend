@@ -1,0 +1,6 @@
+id = "productivity.file-intelligence"
+name = "file-intelligence"
+category = "productivity"
+version = "0.1.0"
+api_version = 1
+capabilities = ["files.study", "files.organize", "files.merge"]

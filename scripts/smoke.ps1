@@ -1,8 +1,9 @@
 $ErrorActionPreference = "Stop"
 $Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-Push-Location $Root
 $TempRoot = Join-Path "extensions" ".lmlmxtend-smoke-$PID"
 try {
+    Push-Location $Root
+
     Write-Host "==> Extension runtime example"
     cargo run --example basic_extension -p lmlmxtend-runtime
     if ($LASTEXITCODE -ne 0) { throw "Extension example failed" }
@@ -14,6 +15,10 @@ try {
     Write-Host "==> Extension Forge help"
     cargo run -p lmlmxtend-extension-forge -- help
     if ($LASTEXITCODE -ne 0) { throw "Forge help failed" }
+
+    Write-Host "==> File Intelligence extension tests"
+    cargo test --manifest-path "extensions/productivity/file-intelligence/Cargo.toml"
+    if ($LASTEXITCODE -ne 0) { throw "File Intelligence tests failed" }
 
     if (Test-Path $TempRoot) { throw "Temporary smoke directory already exists: $TempRoot" }
     New-Item -ItemType Directory -Path "extensions" -Force | Out-Null
@@ -29,5 +34,5 @@ try {
 }
 finally {
     if (Test-Path $TempRoot) { Remove-Item -Recurse -Force $TempRoot }
-    Pop-Location
+    if ((Get-Location).Path -eq $Root) { Pop-Location }
 }

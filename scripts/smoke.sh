@@ -13,6 +13,13 @@ cargo run --example basic_agent -p lmlmxtend-agent-runtime
 echo "==> Extension Forge help"
 cargo run -p lmlmxtend-extension-forge -- help
 
+echo "==> File Intelligence extension tests"
+cargo test --manifest-path extensions/productivity/file-intelligence/Cargo.toml
+
+echo "==> Compile native LMLM generation example"
+cargo check -p lmlmxtend-processor-bridge --example local_lmlm_http_generation
+bash -n scripts/e2e_native_lmlm.sh
+
 echo "==> Generate and compile a temporary extension"
 mkdir -p extensions
 TEMP_ROOT="$(mktemp -d extensions/.lmlmxtend-smoke.XXXXXX)"

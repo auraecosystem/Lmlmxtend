@@ -25,28 +25,33 @@
 - [x] Initial agent-runtime workspace boundary with permission-aware registration and bounded delegation.
 - [ ] Complete target workspace boundaries for multimodal, execution, and security.
 
-## Milestone 2 — LMLM processor bridge
+## Milestone 2 — LMLM Processor v1 integration
 
-- [x] Add a model-agnostic goal-planner contract and guarded proposal execution.
-- [ ] Agree a stable processor-facing contract with the LMLM repository.
-- [ ] Local IPC/in-process adapter selected based on LMLM's actual runtime.
-- [ ] Capability negotiation and version compatibility.
-- [ ] No assumptions about model internals or weights.
+- [x] Agree and document the stable `lmlm.processor.v1` JSON contract with the LMLM repository.
+- [x] Implement the local loopback HTTP adapter and health handshake.
+- [x] Validate protocol version, response envelope, and correlation/request ID.
+- [x] Register the concrete adapter through the `lmlm.process` runtime capability.
+- [x] Keep the LMLM model implementation and model assets in the LMLM repository.
+- [ ] Add an automated cross-project end-to-end test that starts the LMLM service and uses a real installed model.
+- [x] Add typed optional `max_tokens` and `temperature` parameters and forward them through the v1 bridge.
+
+**Milestone status:** the text-processing integration foundation is implemented. This does not mean the full multimodal processor is complete.
 
 ## Milestone 3 — Intelligence and multimodal services
 
+- [x] Model-agnostic goal-planner contract and guarded proposal execution.
 - [x] Deterministic capability discovery and task planning (single-provider registry).
 - [ ] Multi-provider ranking and semantic task orchestration.
-- [ ] Implement the concrete LMLM processor adapter after its public interface is agreed.
+- [x] Concrete local LMLM Processor v1 adapter for text inference.
 - [x] Initial synchronous agent lifecycle and nested task delegation with cycle/depth limits.
 - [x] Deterministic DAG validation, dependency waves, and fail-fast agent-plan execution.
 - [x] Bounded parallel execution (1–32 workers) with dependency barriers and panic/error handling.
 - [x] Per-root-execution shared key/value state and bounded in-process agent mailboxes.
 - [ ] Durable shared state, cross-process messaging, retries, rollback, and distributed scheduling.
-- [ ] Durable task state, cross-process messaging, retries, rollback, and distributed scheduling.
-- [ ] Typed image, audio, video, and spatial data contracts.
-- [ ] Streaming and cancellation semantics.
+- [ ] Typed image, audio, video, and spatial inference contracts with LMLM-native backend support.
+- [ ] Streaming and end-to-end cancellation semantics.
 - [ ] Memory interface with explicit ownership and retention controls.
+- [ ] Device selection, batching, and inference resource accounting.
 
 ## Milestone 4 — Application adapters and SDKs
 
@@ -63,4 +68,4 @@
 - [ ] Permission grants and revocation.
 - [ ] Resource quotas and audit trail.
 
-A milestone is complete only when implementation, tests, documentation, and compatibility checks are present. Planned items are not current capabilities.
+A milestone is complete only when implementation, tests, documentation, and compatibility checks are present. Planned items are not current capabilities. The processor v1 checklist distinguishes the implemented text integration and generation-parameter forwarding from the still-missing automated real-model end-to-end test. Capability negotiation remains deferred until the LMLM service exposes a capability-discovery endpoint.

@@ -4,7 +4,13 @@ use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
 const CATEGORIES: &[&str] = &[
-    "creative", "language", "vision", "audio", "spatial", "agents",
+    "creative",
+    "language",
+    "vision",
+    "audio",
+    "spatial",
+    "agents",
+    "productivity",
 ];
 
 fn main() {
@@ -35,7 +41,7 @@ USAGE:
   lmlmxtend-forge new --name <slug> --category <category> --capability <namespace.action> [--root <path>]
 
 CATEGORIES:
-  creative, language, vision, audio, spatial, agents
+  creative, language, vision, audio, spatial, agents, productivity
 
 EXAMPLE:
   lmlmxtend-forge new --name scene-composer --category creative --capability creative.compose

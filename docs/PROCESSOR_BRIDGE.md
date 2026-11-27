@@ -2,49 +2,123 @@
 
 ## Purpose
 
-The processor bridge defines a typed, local boundary between LMLMxtend and the LMLM neural processor. LMLM remains the authoritative model implementation. LMLMxtend owns extension discovery, capability policy, request lifecycle integration, and the adapter boundary; it does not own model weights or inference kernels.
+The processor bridge is the versioned, local boundary between LMLMxtend and the LMLM neural processor. LMLM owns model assets, tokenization, inference, and neural execution. LMLMxtend owns the typed adapter, capability registration, request limits, and host-side lifecycle checks. It does not reimplement the model.
 
-## Current repository compatibility
+## Implemented integration: LMLM Processor v1
 
-The current `auraecosystem/lmlm` repository does not yet expose a verified, stable Rust processor crate or a documented Rust inference ABI. Its checked-in `Api.ts` describes a broad client surface, while the repository README describes a Python/local toolkit. Neither is sufficient evidence for a concrete Rust backend binding.
+The current cross-project contract is:
 
-For that reason this milestone introduces an explicit Rust trait contract rather than guessing at an internal LMLM API:
+- Protocol identifier: `lmlm.processor.v1`; protocol version: `1`.
+- Service bind: IPv4 loopback only, `127.0.0.1:8765` by default.
+- Health: `GET /v1/health`.
+- Inference: `POST /v1/process`.
+- Request envelope: `request_id`, `modality`, `content_type`, `payload_hex`, optional `prompt` and `parameters`.
+- Response envelope: matching `request_id`, `content_type`, and `payload_hex`.
+- Binary payloads are hex-encoded for lossless transport.
 
-- `LmlmProcessor`: backend contract implemented by LMLM or a host-owned adapter.
-- `ProcessorRequest`: modality, opaque payload bytes, media type, optional prompt, and correlation ID.
-- `ProcessorResponse`: opaque output bytes and declared media type.
-- `ExecutionContext`: cooperative cancellation, deadline, and output-size controls.
-- `ProcessorBridge`: an injectable adapter that implements the existing LMLMxtend `Extension` contract.
+The Rust `HttpLmlmProcessor` accepts a `SocketAddr`, rejects non-loopback and IPv6 addresses, checks the v1 health response, validates the response protocol and request ID, and applies bounded connection/read/write timeouts. The bridge checks cancellation before and after the synchronous request. An in-flight socket operation is bounded by its timeout, not immediately interruptible by cancellation.
 
-## Modality support
+## LMLM service backends
 
-The typed bridge carries text, image, audio, video, and mixed-modality payloads without interpreting or rewriting their bytes. The concrete backend is responsible for decoding, preprocessing, model execution, and output encoding.
+The LMLM service currently has two local execution modes:
 
-The existing extension contract is string-based. Its `lmlm.process` capability therefore provides a UTF-8 text path only. Binary and multimodal callers use `ProcessorBridge::process` directly until a versioned binary extension transport is designed.
+1. **`native_cpu` (recommended):** loads the LMLM model manifest and assets from `LMLM_MODEL_DIR`, then calls the in-process LMLM native CPU engine. No separate inference server is required.
+2. **`local_openai` (compatibility):** forwards text generation to an already-running OpenAI-compatible inference endpoint on `127.0.0.1`. This is an adapter mode, not the LMLM model implementation.
 
-## Host integration
+Both modes are local-only. The service does not download model weights, call remote providers, or silently fall back to a cloud model.
 
-1. Implement `LmlmProcessor` in the LMLM repository or in an integration crate owned by the host.
-2. Inject that implementation with `ProcessorBridge::new(Arc::new(your_backend))`.
-3. Register the bridge with `lmlmxtend_runtime::Runtime`.
-4. Dispatch text requests through the `lmlm.process` capability, or call the typed bridge API for binary/multimodal requests.
+### Start native CPU mode
 
-No cloud model provider is required. No remote endpoint is assumed.
+From the LMLM repository root, prepare a model directory containing the files required by the LMLM native CPU inference format, then run:
 
-## Safety and limitations
+```bash
+LMLM_BACKEND=native_cpu \
+LMLM_MODEL_DIR=./model \
+LMLM_PROCESSOR_HOST=127.0.0.1 \
+LMLM_PROCESSOR_PORT=8765 \
+python -m lmlm_processor.server
+```
 
-- Request and response byte limits are checked by the bridge.
-- Cancellation and deadlines are cooperative. A backend must check the supplied context during bounded work; Rust cannot safely force-stop an arbitrary in-process implementation.
-- This adapter is not a process sandbox and does not enforce hard CPU, memory, GPU, or wall-clock quotas.
-- The bridge does not claim to perform inference. Until LMLM publishes a stable backend implementation, a concrete processor must be supplied by the integrating host.
-- The bridge is synchronous in this milestone. Streaming, async execution, tensor handles, zero-copy buffers, batching, and device selection require separately versioned contracts.
+### Start compatibility mode
+
+```bash
+LMLM_BACKEND=local_openai \
+LMLM_INFERENCE_URL=http://127.0.0.1:8080/v1 \
+LMLM_PROCESSOR_HOST=127.0.0.1 \
+LMLM_PROCESSOR_PORT=8765 \
+python -m lmlm_processor.server
+```
+
+The compatibility endpoint must provide `GET /health` and `POST /v1/chat/completions`. Its URL is restricted to plain HTTP on `127.0.0.1`; credentials, query strings, fragments, hostnames, and remote addresses are rejected.
+
+## Connect from a Rust host
+
+Start the LMLM service first, then run:
+
+```bash
+cargo run -p lmlmxtend-processor-bridge --example local_lmlm_http
+```
+
+The example constructs `HttpLmlmProcessor` for `127.0.0.1:8765`, performs a health check, injects it into `ProcessorBridge`, registers the bridge with `lmlmxtend_runtime::Runtime`, and dispatches the `lmlm.process` capability.
+
+For an application host, the same composition can be embedded:
+
+```rust
+let processor = HttpLmlmProcessor::new("127.0.0.1:8765".parse()?)?;
+processor.health_check()?;
+let bridge = ProcessorBridge::new(Arc::new(processor));
+runtime.register(Arc::new(bridge))?;
+```
+
+## Modality and parameter status
+
+The Rust request type and wire protocol represent text, image, audio, video, and mixed-modality payloads. **The current LMLM backends execute text only.** Non-text requests are rejected by the backend; representing a modality in the envelope does not mean the model can process it.
+
+The generic extension request is string-based. Binary or modality-specific callers must use `ProcessorBridge::process` directly. The Rust bridge exposes `GenerationParameters` and forwards optional `max_tokens` (1–4096) and `temperature` (0–2) fields through the existing v1 `parameters` object. Unset values are omitted so each LMLM backend retains its own defaults. Validation occurs before network I/O. The v1 wire contract remains unchanged.
+
+Capability discovery/negotiation is not exposed by the current LMLM v1 service; the client validates the fixed protocol identifier and version instead. Streaming, batching, device selection, modality-specific preprocessing/inference, and cross-process cancellation are not implemented.
+
+## Native LMLM cross-project end-to-end test
+
+The repository includes a runner that starts the actual Python LMLM Processor v1 service in `native_cpu` mode, waits for its health endpoint, and invokes the Rust bridge with explicit generation parameters. It requires an installed LMLM model; it does not download weights or substitute a mock model.
+
+Set the paths to the two existing checkouts and run from LMLMxtend:
+
+```bash
+LMLM_REPO_ROOT=/path/to/lmlm \
+LMLM_MODEL_DIR=/path/to/installed-lmlm-model \
+bash scripts/e2e_native_lmlm.sh
+```
+
+The model directory must contain `lmlm-model.json` and all assets referenced by its manifest. The runner binds the service to IPv4 loopback only, terminates the service on exit, and fails if startup, health validation, Rust inference, or output validation fails. You can override `PYTHON`, `LMLM_PROCESSOR_PORT`, and the Rust client address is set from that port automatically.
+
+This is a real-model test, not part of the default hosted CI because model weights are operator-installed local assets and are not committed to either repository. Run it on a machine that has the model and Python dependencies installed.
+
+## Limits and security boundaries
+
+- The LMLM HTTP service refuses to bind to a non-loopback host.
+- The Rust HTTP client refuses non-loopback and IPv6 destinations; it takes a socket address rather than an arbitrary URL.
+- The LMLM protocol limits decoded request payloads to 8 MiB and request bodies to 18 MiB.
+- LMLMxtend applies its own request and host-configured output limits.
+- Transport timeouts are bounded (default 120 seconds; maximum 600 seconds).
+- The service has no authentication. Keep it on loopback; do not expose it through a tunnel, public reverse proxy, or network port forward.
+- Model assets must be installed locally by the operator.
+- The bridge is not a process sandbox and does not impose hard CPU, memory, GPU, or wall-clock quotas on inference.
 
 ## Verification
 
-Run:
+From the LMLMxtend repository:
 
 ```bash
 cargo test --workspace
 bash scripts/verify.sh
 bash scripts/smoke.sh
 ```
+
+From the LMLM repository:
+
+```bash
+python -m unittest tests.test_processor_v1 -v
+```
+
+These commands validate the components separately. The native cross-project runner above is the required end-to-end check for a real installed model; a passing unit-test result does not replace it.

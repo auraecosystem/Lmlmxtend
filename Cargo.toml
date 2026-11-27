@@ -8,6 +8,7 @@ members = [
     "crates/extension-forge",
     "crates/intelligence",
     "crates/agent-runtime",
+    "extensions/ecg-processor",
 ]
 
 [workspace.package]

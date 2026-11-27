@@ -1,9 +1,13 @@
-//! Typed boundary between LMLMxtend and an independently implemented LMLM processor.
+//! Typed, modality-aware boundary between LMLMxtend and the local LMLM processor.
 //!
-//! This crate deliberately does not implement inference or depend on a model runtime.
-//! A concrete LMLM backend implements `LmlmProcessor` and is injected by the host.
-//! The typed API carries arbitrary modality payloads; the generic Extension adapter
-//! currently exposes UTF-8 text requests through the existing string-based contract.
+//! The crate provides an injectable processor trait, a local HTTP client for the
+//! versioned LMLM Processor v1 service, and an extension adapter for the runtime.
+
+mod generation;
+mod http;
+
+pub use generation::GenerationParameters;
+pub use http::HttpLmlmProcessor;
 
 use lmlmxtend_api::{
     CapabilityId, ExecutionContext, Extension, ExtensionError, ExtensionManifest, ExtensionRequest,
@@ -87,6 +91,26 @@ pub trait LmlmProcessor: Send + Sync {
         context: &ExecutionContext,
     ) -> Result<ProcessorResponse, ProcessorError>;
 
+    /// Processes a request with explicit generation controls.
+    ///
+    /// Existing processor implementations remain source-compatible: implementations
+    /// that do not override this method accept the default (empty) configuration and
+    /// reject non-empty parameters rather than silently ignoring them.
+    fn process_with_parameters(
+        &self,
+        request: ProcessorRequest,
+        parameters: &GenerationParameters,
+        context: &ExecutionContext,
+    ) -> Result<ProcessorResponse, ProcessorError> {
+        parameters.validate()?;
+        if !parameters.is_empty() {
+            return Err(ProcessorError::InvalidInput(
+                "processor implementation does not support generation parameters".into(),
+            ));
+        }
+        self.process(request, context)
+    }
+
     /// A lightweight readiness check; it should not load weights or run inference.
     fn health_check(&self) -> Result<(), ProcessorError> {
         Ok(())
@@ -123,6 +147,16 @@ impl ProcessorBridge {
         request: ProcessorRequest,
         context: &ExecutionContext,
     ) -> Result<ProcessorResponse, ProcessorBridgeError> {
+        self.process_with_parameters(request, &GenerationParameters::default(), context)
+    }
+
+    /// Processes a request with validated generation parameters.
+    pub fn process_with_parameters(
+        &self,
+        request: ProcessorRequest,
+        parameters: &GenerationParameters,
+        context: &ExecutionContext,
+    ) -> Result<ProcessorResponse, ProcessorBridgeError> {
         context
             .check_cancelled()
             .map_err(ProcessorBridgeError::ExecutionControl)?;
@@ -132,9 +166,12 @@ impl ProcessorBridge {
                 limit: self.max_request_bytes,
             });
         }
+        parameters
+            .validate()
+            .map_err(ProcessorBridgeError::Processor)?;
         let response = self
             .processor
-            .process(request, context)
+            .process_with_parameters(request, parameters, context)
             .map_err(ProcessorBridgeError::Processor)?;
         context
             .check_cancelled()
@@ -293,6 +330,25 @@ mod tests {
         assert!(matches!(
             error,
             ProcessorBridgeError::RequestTooLarge { limit: 2, .. }
+        ));
+    }
+
+    #[test]
+    fn unsupported_processor_rejects_non_empty_generation_parameters() {
+        let bridge = bridge();
+        let error = bridge
+            .process_with_parameters(
+                ProcessorRequest::text("hello"),
+                &GenerationParameters {
+                    max_tokens: Some(32),
+                    temperature: None,
+                },
+                &ExecutionContext::default(),
+            )
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            ProcessorBridgeError::Processor(ProcessorError::InvalidInput(_))
         ));
     }
 

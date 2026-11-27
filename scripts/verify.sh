@@ -5,6 +5,9 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 FILE_INTELLIGENCE="extensions/productivity/file-intelligence/Cargo.toml"
 
+echo "==> Python static contract tests"
+python -m unittest discover -s tests -p 'test_*.py'
+
 echo "==> Rust workspace formatting"
 cargo fmt --all -- --check
 

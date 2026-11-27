@@ -1,3 +1,7 @@
+"""Metal-backed symbolic key/value memory for Apple platforms.
+
+The Metal backend is optional and is not imported by the Rust workspace.
+"""
 
 from pathlib import Path
 import ctypes
@@ -8,9 +12,11 @@ import numpy as np
 
 EMPTY_KEY = 0xFFFFFFFF
 LOCKED_KEY = 0xFFFFFFFE
-UINT32_MAX = 0xFFFFFFFF
-
 SHARED = Metal.MTLResourceStorageModeShared
+
+DEFAULT_SHADER = (
+    Path(__file__).resolve().parent / "kernels" / "lmlm_hash.metal"
+)
 
 
 def check_error(result, error, operation):
@@ -21,9 +27,20 @@ def check_error(result, error, operation):
 
 
 class MetalHashStore:
-    def __init__(self, capacity=1024 * 1024, shader_path="lmlm_hash.metal"):
+    """A fixed-capacity, linear-probing hash table backed by Metal buffers.
+
+    Insertion batches must contain unique keys. Calls are synchronous: each
+    dispatch waits for completion before returning. Concurrent calls from
+    multiple host threads and concurrent duplicate-key updates are not
+    supported by this prototype.
+    """
+
+    def __init__(self, capacity=1024 * 1024, shader_path=None):
         if capacity <= 0 or capacity & (capacity - 1):
             raise ValueError("Capacity must be a positive power of two")
+
+        if capacity > 0xFFFFFFFF:
+            raise ValueError("Capacity must fit in a uint32")
 
         self.capacity = capacity
         self.device = Metal.MTLCreateSystemDefaultDevice()
@@ -32,11 +49,11 @@ class MetalHashStore:
             raise RuntimeError("Metal device unavailable")
 
         self.queue = self.device.newCommandQueue()
-
         if self.queue is None:
             raise RuntimeError("Could not create Metal command queue")
 
-        source = Path(shader_path).read_text(encoding="utf-8")
+        source_path = Path(shader_path) if shader_path else DEFAULT_SHADER
+        source = source_path.read_text(encoding="utf-8")
 
         library, error = self.device.newLibraryWithSource_options_error_(
             source, None, None
@@ -47,19 +64,20 @@ class MetalHashStore:
         self.lookup_pipeline = self._pipeline("hash_lookup")
 
         self.table_keys = self._buffer(
-            capacity * 4,
-            initialize=b"\xff" * (capacity * 4)
+            capacity * np.dtype(np.uint32).itemsize,
+            initialize=b"\xff" * (capacity * 4),
         )
         self.table_values = self._buffer(capacity * 4)
 
     def _pipeline(self, function_name):
         function = self.library.newFunctionWithName_(function_name)
-
         if function is None:
             raise RuntimeError(f"Missing Metal function: {function_name}")
 
         pipeline, error = (
-            self.device.newComputePipelineStateWithFunction_error_(function, None)
+            self.device.newComputePipelineStateWithFunction_error_(
+                function, None
+            )
         )
         return check_error(pipeline, error, function_name)
 
@@ -74,52 +92,64 @@ class MetalHashStore:
 
         if buffer is None:
             raise MemoryError(f"Metal buffer allocation failed: {size} bytes")
-
         return buffer
 
     def _upload(self, array):
         array = np.ascontiguousarray(array, dtype=np.uint32)
-
         buffer = self.device.newBufferWithBytes_length_options_(
-            array.ctypes.data,
-            array.nbytes,
-            SHARED
+            array.ctypes.data, array.nbytes, SHARED
         )
-
         if buffer is None:
             raise MemoryError("Metal input buffer allocation failed")
-
         return buffer
 
-    def _read(self, buffer, count):
+    @staticmethod
+    def _read(buffer, count):
         raw = ctypes.string_at(buffer.contents(), count * 4)
         return np.frombuffer(raw, dtype=np.uint32).copy()
 
-    def _dispatch(self, pipeline, buffers, capacity, count):
+    def _dispatch(
+        self,
+        pipeline,
+        indexed_buffers,
+        capacity,
+        count,
+        capacity_index,
+        count_index,
+    ):
+        if count <= 0:
+            return
+
         command_buffer = self.queue.commandBuffer()
+        if command_buffer is None:
+            raise RuntimeError("Could not create Metal command buffer")
+
         encoder = command_buffer.computeCommandEncoder()
+        if encoder is None:
+            raise RuntimeError("Could not create Metal compute encoder")
 
         encoder.setComputePipelineState_(pipeline)
 
-        for index, buffer in enumerate(buffers):
+        # Bind resources at the exact [[buffer(n)]] indices in the shader.
+        for index, buffer in indexed_buffers:
             encoder.setBuffer_offset_atIndex_(buffer, 0, index)
 
-        capacity_bytes = np.uint32(capacity).tobytes()
-        count_bytes = np.uint32(count).tobytes()
-
-        if pipeline is self.insert_pipeline:
-            encoder.setBytes_length_atIndex_(capacity_bytes, 4, 4)
-            encoder.setBytes_length_atIndex_(count_bytes, 4, 5)
-        else:
-            encoder.setBytes_length_atIndex_(capacity_bytes, 4, 3)
-            encoder.setBytes_length_atIndex_(count_bytes, 4, 4)
+        encoder.setBytes_length_atIndex_(
+            np.uint32(capacity).tobytes(), 4, capacity_index
+        )
+        encoder.setBytes_length_atIndex_(
+            np.uint32(count).tobytes(), 4, count_index
+        )
 
         width = pipeline.threadExecutionWidth()
-        groups = (count + width - 1) // width
+        if width <= 0:
+            encoder.endEncoding()
+            raise RuntimeError("Metal returned an invalid thread execution width")
 
+        groups = (count + width - 1) // width
         encoder.dispatchThreadgroups_threadsPerThreadgroup_(
             Metal.MTLSizeMake(groups, 1, 1),
-            Metal.MTLSizeMake(width, 1, 1)
+            Metal.MTLSizeMake(width, 1, 1),
         )
 
         encoder.endEncoding()
@@ -137,13 +167,10 @@ class MetalHashStore:
 
         if len(keys) != len(values):
             raise ValueError("Keys and values must have equal lengths")
-
         if len(np.unique(keys)) != len(keys):
             raise ValueError("Keys must be unique within an insertion batch")
-
         if np.any(keys >= LOCKED_KEY):
             raise ValueError("0xFFFFFFFE and 0xFFFFFFFF are reserved keys")
-
         if len(keys) == 0:
             return np.empty(0, dtype=np.uint32)
 
@@ -154,16 +181,17 @@ class MetalHashStore:
         self._dispatch(
             self.insert_pipeline,
             [
-                input_keys,
-                input_values,
-                self.table_keys,
-                self.table_values,
-                results
+                (0, input_keys),
+                (1, input_values),
+                (2, self.table_keys),
+                (3, self.table_values),
+                (6, results),
             ],
             self.capacity,
-            len(keys)
+            len(keys),
+            capacity_index=4,
+            count_index=5,
         )
-
         return self._read(results, len(keys))
 
     def lookup(self, keys):
@@ -171,11 +199,10 @@ class MetalHashStore:
 
         if np.any(keys >= LOCKED_KEY):
             raise ValueError("Reserved keys cannot be queried")
-
         if len(keys) == 0:
             return (
                 np.empty(0, dtype=np.uint32),
-                np.empty(0, dtype=np.uint32)
+                np.empty(0, dtype=np.uint32),
             )
 
         query_buffer = self._upload(keys)
@@ -185,17 +212,18 @@ class MetalHashStore:
         self._dispatch(
             self.lookup_pipeline,
             [
-                query_buffer,
-                self.table_keys,
-                self.table_values,
-                output_values,
-                found
+                (0, query_buffer),
+                (1, self.table_keys),
+                (2, self.table_values),
+                (5, output_values),
+                (6, found),
             ],
             self.capacity,
-            len(keys)
+            len(keys),
+            capacity_index=3,
+            count_index=4,
         )
-
         return (
             self._read(output_values, len(keys)),
-            self._read(found, len(keys))
+            self._read(found, len(keys)),
         )

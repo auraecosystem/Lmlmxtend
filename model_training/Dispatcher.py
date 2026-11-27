@@ -124,9 +124,11 @@ class MetalHashStore:
     ):
         """Dispatch a kernel using its declared Metal buffer indices."""
         command_buffer = self.queue.commandBuffer()
-        encoder = command_buffer.computeCommandEncoder()
+        if command_buffer is None:
+            raise RuntimeError("Could not create Metal command buffer")
 
-        if command_buffer is None or encoder is None:
+        encoder = command_buffer.computeCommandEncoder()
+        if encoder is None:
             raise RuntimeError("Could not create Metal compute command encoder")
 
         encoder.setComputePipelineState_(pipeline)

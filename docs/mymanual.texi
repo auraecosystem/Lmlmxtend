@@ -1,0 +1,12 @@
+@menu
+* Introduction::                Overview and installation.
+* Usage::                       Command-line options and examples.
+* Infrastructure Runtime::      Terraform AWS module and TTL lifecycle.
+* GNU Free Documentation License::  License terms for this manual.
+* Concept Index::               Index of concepts and commands.
+@end menu
+
+@include intro.texi
+@include usage.texi
+@include infrastructure.texi
+@include fdl.texi

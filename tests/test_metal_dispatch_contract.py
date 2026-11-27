@@ -52,11 +52,10 @@ class MetalDispatchContractTests(unittest.TestCase):
         ]
         self.assertEqual(len(calls), 2)
 
-        # The fifth positional argument is the indexed-buffer list.
         bindings = []
         for call in calls:
-            pairs = ast.literal_eval(call.args[1])
-            bindings.append([index for index, _ in pairs])
+            pairs = call.args[1].elts
+            bindings.append([ast.literal_eval(pair.elts[0]) for pair in pairs])
 
         self.assertIn([0, 1, 2, 3, 6], bindings)
         self.assertIn([0, 1, 2, 5, 6], bindings)
